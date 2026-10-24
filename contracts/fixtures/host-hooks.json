@@ -1,0 +1,1131 @@
+{
+  "events": {
+    "codex": [
+      "SessionStart",
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PermissionRequest",
+      "PostToolUse",
+      "Stop",
+      "Interrupt",
+      "SessionEnd"
+    ],
+    "claude-code": [
+      "SessionStart",
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PermissionRequest",
+      "PostToolUse",
+      "PostToolUseFailure",
+      "Stop",
+      "StopFailure",
+      "SessionEnd"
+    ]
+  },
+  "quotes": [
+    {
+      "path": "/tmp/pet-hook",
+      "quoted": "/tmp/pet-hook"
+    },
+    {
+      "path": "/tmp/a space/pet-hook",
+      "quoted": "'/tmp/a space/pet-hook'"
+    },
+    {
+      "path": "/tmp/it's/pet-hook",
+      "quoted": "'/tmp/it'\"'\"'s/pet-hook'"
+    },
+    {
+      "path": "",
+      "quoted": "''"
+    },
+    {
+      "path": "/tmp/a_@%+=:,./-",
+      "quoted": "/tmp/a_@%+=:,./-"
+    }
+  ],
+  "cases": [
+    {
+      "name": "empty-codex",
+      "config": {},
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "empty-claude",
+      "config": {},
+      "target": "claude-code",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook claude-code",
+      "expected": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUseFailure": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "StopFailure": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook claude-code",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "space-path",
+      "config": {},
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/a space/pet-hook",
+      "command": "'/tmp/a space/pet-hook' codex",
+      "expected": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/a space/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "quote-path",
+      "config": {},
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/it's/pet-hook",
+      "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+      "expected": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'/tmp/it'\"'\"'s/pet-hook' codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "preserve-and-collapse",
+      "config": {
+        "env": {
+          "keep": true
+        },
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "x",
+              "extra": 4,
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "other",
+                  "timeout": 13
+                },
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex"
+                },
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                },
+                null
+              ]
+            }
+          ],
+          "Custom": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex"
+                }
+              ]
+            }
+          ],
+          "Empty": [],
+          "EmptyGroup": [
+            {
+              "matcher": "keep",
+              "hooks": []
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {
+        "env": {
+          "keep": true
+        },
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "x",
+              "extra": 4,
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "other",
+                  "timeout": 13
+                },
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                },
+                null
+              ]
+            },
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "EmptyGroup": [
+            {
+              "matcher": "keep",
+              "hooks": []
+            }
+          ],
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "remove-only-owned",
+      "config": {
+        "env": {
+          "keep": true
+        },
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "x",
+              "extra": 4,
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "other",
+                  "timeout": 13
+                },
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex"
+                },
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                },
+                null
+              ]
+            }
+          ],
+          "Custom": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex"
+                }
+              ]
+            }
+          ],
+          "Empty": [],
+          "EmptyGroup": [
+            {
+              "matcher": "keep",
+              "hooks": []
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "remove",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {
+        "env": {
+          "keep": true
+        },
+        "hooks": {
+          "Stop": [
+            {
+              "matcher": "x",
+              "extra": 4,
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "other",
+                  "timeout": 13
+                },
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                },
+                null
+              ]
+            }
+          ],
+          "EmptyGroup": [
+            {
+              "matcher": "keep",
+              "hooks": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "idempotent",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "remove-last",
+      "config": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PermissionRequest": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "Interrupt": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ],
+          "SessionEnd": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "/tmp/pet-hook codex",
+                  "timeout": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "remove",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {}
+    },
+    {
+      "name": "remove-missing",
+      "config": {},
+      "target": "codex",
+      "operation": "remove",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {}
+    },
+    {
+      "name": "same-command-other-type",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "remove",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "expected": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "prompt",
+                  "command": "/tmp/pet-hook codex"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "hooks-array",
+      "config": {
+        "hooks": []
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Existing hooks must be an object"
+    },
+    {
+      "name": "hooks-null",
+      "config": {
+        "hooks": null
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Existing hooks must be an object"
+    },
+    {
+      "name": "event-object",
+      "config": {
+        "hooks": {
+          "Stop": {}
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Existing hook Stop must be an array"
+    },
+    {
+      "name": "group-missing-hooks",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {}
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Invalid hook group in Stop"
+    },
+    {
+      "name": "group-hooks-object",
+      "config": {
+        "hooks": {
+          "Stop": [
+            {
+              "hooks": {}
+            }
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Invalid hook group in Stop"
+    },
+    {
+      "name": "group-not-object",
+      "config": {
+        "hooks": {
+          "Stop": [
+            3
+          ]
+        }
+      },
+      "target": "codex",
+      "operation": "install",
+      "helperPath": "/tmp/pet-hook",
+      "command": "/tmp/pet-hook codex",
+      "error": "Invalid hook group in Stop"
+    }
+  ]
+}

@@ -6,12 +6,36 @@ from contextlib import redirect_stdout
 import io
 import tempfile
 import stat
+import copy
+import json
+import shlex
 spec = importlib.util.spec_from_file_location('install_hooks', Path(__file__).parents[1] / 'install-hooks.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
 class InstallHooksTests(unittest.TestCase):
+    def test_shared_fixtures_match_installer(self):
+        fixtures = json.loads((Path(__file__).parents[2] / 'contracts/fixtures/host-hooks.json').read_text())
+        self.assertEqual(module.EVENTS, fixtures['events'])
+        for case in fixtures['cases']:
+            with self.subTest(case=case['name']):
+                original = copy.deepcopy(case['config'])
+                self.assertEqual(case['command'], shlex.quote(case['helperPath']) + ' ' + case['target'])
+                if 'error' in case:
+                    with self.assertRaisesRegex(ValueError, case['error']):
+                        module.merge_hooks(case['config'], case['command'], module.EVENTS[case['target']], case['operation'] == 'remove')
+                else:
+                    result = module.merge_hooks(case['config'], case['command'], module.EVENTS[case['target']], case['operation'] == 'remove')
+                    self.assertEqual(result, case['expected'])
+                self.assertEqual(case['config'], original)
+
+    def test_shared_quotes_match_real_shlex(self):
+        fixtures = json.loads((Path(__file__).parents[2] / 'contracts/fixtures/host-hooks.json').read_text())
+        for case in fixtures['quotes']:
+            with self.subTest(path=case['path']):
+                self.assertEqual(shlex.quote(case['path']), case['quoted'])
+
     def test_merge_is_idempotent_and_preserves_other_settings(self):
         command = "'/a space/pet-hook' codex"
         original = {'env': {'private': 'keep'}, 'hooks': {'Stop': [{'matcher': 'x', 'hooks': [
