@@ -161,6 +161,39 @@ struct PetNotificationTests {
         #expect(adapter.requests.last == false)
     }
 
+    @Test func singleLineBubbleHugsContentAtHistoricalCenter() throws {
+        _ = NSApplication.shared
+        let view = PetView(assets: try PetAssets())
+        view.frame = NSRect(x: 0, y: 0, width: 140, height: 154)
+        try view.render(pose: .thinking, text: "正在思考")
+        view.layoutSubtreeIfNeeded()
+        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
+        #expect(label.frame.height < 30)
+        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
+        let measured = try #require(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: label.frame.width, height: .greatestFiniteMagnitude)))
+        #expect(label.frame.height >= measured.height)
+    }
+
+    @Test func textOnlyRenderResizesBubbleAtHistoricalCenter() throws {
+        _ = NSApplication.shared
+        let view = PetView(assets: try PetAssets())
+        view.frame = NSRect(x: 0, y: 0, width: 140, height: 154)
+        try view.render(pose: .thinking, text: "正在思考")
+        view.layoutSubtreeIfNeeded()
+        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
+        let singleLineHeight = label.frame.height
+        #expect(!view.needsLayout)
+        try view.render(pose: .thinking, text: "Claude Code\n本轮结束 · 1 执行中")
+        #expect(view.needsLayout)
+        view.layoutSubtreeIfNeeded()
+        #expect(label.frame.height > singleLineHeight)
+        #expect(label.frame.height <= 30)
+        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
+        try view.render(pose: .thinking, text: "正在思考")
+        view.layoutSubtreeIfNeeded()
+        #expect(label.frame.height == singleLineHeight)
+    }
+
     @Test func parallelEndFeedbackFitsTwoLinesWithSourceAndRemainingWork() throws {
         _ = NSApplication.shared
         let store = PetStore()
@@ -183,6 +216,8 @@ struct PetNotificationTests {
         let measured = try #require(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: label.frame.width, height: 1000)))
         label.maximumNumberOfLines = 2
         #expect(measured.height <= label.frame.height)
+        #expect(label.frame.height <= 30)
+        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
         let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: bitmap)
         let png = try #require(bitmap.representation(using: .png, properties: [:]))

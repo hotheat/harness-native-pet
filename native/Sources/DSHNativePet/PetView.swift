@@ -79,7 +79,10 @@ final class PetView: NSView {
         } else if videoPlayback.isActive {
             stopVideo()
         }
-        message.stringValue = text
+        if message.stringValue != text {
+            message.stringValue = text
+            needsLayout = true
+        }
         message.isHidden = text.isEmpty
         toolTip = text.isEmpty ? "DSH 桌宠" : text
         setAccessibilityValue(text)
@@ -101,7 +104,11 @@ final class PetView: NSView {
             videoPlayback.layout(in: characterLayer.bounds)
         }
         CATransaction.commit()
-        message.frame = NSRect(x: 7, y: bounds.height - 34, width: bounds.width - 14, height: 30)
+        let width = bounds.width - 14
+        let textHeight = message.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height ?? 0
+        let height = min(30, max(18, ceil(textHeight) + 4))
+        // 保持原 30 pt 气泡的中心线，避免行数变化时上下跳动。
+        message.frame = NSRect(x: 7, y: bounds.height - 19 - height / 2, width: width, height: height)
     }
 
     override func mouseDown(with event: NSEvent) {
