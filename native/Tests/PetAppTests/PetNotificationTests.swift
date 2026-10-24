@@ -223,6 +223,36 @@ struct PetNotificationTests {
         #expect(model.sourceLabels.isEmpty)
     }
 
+    @Test func automationValidationRejectsMissingValuesAndConflictingModes() {
+        for flag in ["--skin", "--demo-pose", "--capture-preview", "--capture-live", "--capture-skin-switch", "--capture-after", "--notification-log"] {
+            for suffix in [[], ["--demo"], [""]] {
+                #expect(throws: AppDelegate.AppError.self) { try AppDelegate.validateAutomationArguments(["pet", flag] + suffix) }
+            }
+        }
+        for flags in [["--capture-live", "a", "--capture-preview", "b"],
+                      ["--capture-live", "a", "--demo"], ["--capture-skin-switch", "a", "--capture-preview", "b"],
+                      ["--demo", "--demo-pose", "idle"], ["--smoke-test", "--capture-live", "a"],
+                      ["--capture-after", "1"], ["--capture-live", "a", "--capture-after", "nan"],
+                      ["--capture-preview", "a", "--capture-after", "61"], ["--skin", "missing"],
+                      ["--demo-pose", "missing"], ["--demo", "--demo"]] {
+            #expect(throws: AppDelegate.AppError.self) { try AppDelegate.validateAutomationArguments(["pet"] + flags) }
+        }
+    }
+
+    @Test func automationValidationKeepsExistingConsumersAndOneAutomationRule() throws {
+        for flags in [["--smoke-test"], ["--demo"], ["--demo-pose", "working"],
+                      ["--capture-preview", "a", "--demo-pose", "idle"],
+                      ["--capture-live", "a", "--capture-after", "2", "--notification-log", "log"],
+                      ["--capture-skin-switch", "dir"], ["--demo-pose", "working", "--capture-skin-switch", "dir"], ["--notification-log", "log"]] {
+            let arguments = ["pet"] + flags
+            try AppDelegate.validateAutomationArguments(arguments)
+            #expect(AppDelegate.isAutomation(arguments: arguments, environment: [:]))
+        }
+        #expect(!AppDelegate.isAutomation(arguments: ["pet", "--skin", "dshPet"], environment: [:]))
+        #expect(AppDelegate.isAutomation(arguments: ["pet"], environment: ["XCTestConfigurationFilePath": "tests"]))
+        #expect(AppDelegate.isAutomation(arguments: ["pet", "--capture-live"], environment: [:]))
+    }
+
     @Test func staleSessionShowsUncertainty() {
         let store = PetStore()
         store.apply(event(.turnStarted, id: "start"), at: now)

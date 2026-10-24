@@ -8,11 +8,8 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = PetStore()
     private let server = UnixSocketServer()
-    let preferences: PetPreferences = {
-        let automationFlags: Set<String> = ["--smoke-test", "--demo", "--demo-pose", "--capture-preview",
-                                            "--capture-live", "--capture-skin-switch", "--notification-log"]
-        return PetPreferences(persistChanges: !ProcessInfo.processInfo.arguments.contains { automationFlags.contains($0) })
-    }()
+    private let automated: Bool
+    let preferences: PetPreferences
     let status = PetStatusModel()
     var panel: PetPanel?
     var petView: PetView?
@@ -34,21 +31,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var captureDelay: TimeInterval = 1
     private var captureLive = false
     var switchCaptureDirectory: URL?
-    var notifications: PetNotificationDispatcher?
+    private var notifications: PetNotificationDispatcher?
     private var notificationLogPath: String?
     private var canRequestNotificationAuthorization = false
+
+    private static let automationFlags: Set<String> = ["--smoke-test", "--demo", "--demo-pose", "--capture-preview",
+                                                       "--capture-live", "--capture-skin-switch", "--capture-after", "--notification-log"]
+
+    override init() {
+        automated = Self.isAutomation(arguments: ProcessInfo.processInfo.arguments, environment: ProcessInfo.processInfo.environment)
+        preferences = PetPreferences(persistChanges: !automated)
+        super.init()
+    }
+
+    static func isAutomation(arguments: [String], environment: [String: String]) -> Bool {
+        arguments.contains { automationFlags.contains($0) } || environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    static func validateAutomationArguments(_ arguments: [String]) throws {
+        let valueFlags: Set<String> = ["--skin", "--demo-pose", "--capture-preview", "--capture-live",
+                                      "--capture-skin-switch", "--capture-after", "--notification-log"]
+        for (index, flag) in arguments.enumerated() where valueFlags.contains(flag) {
+            guard arguments.indices.contains(index + 1), !arguments[index + 1].isEmpty, !arguments[index + 1].hasPrefix("--") else {
+                throw AppError.invalidArgument("\(flag) 需要值")
+            }
+        }
+        let flags = Set(arguments.filter { automationFlags.contains($0) || $0 == "--skin" })
+        for flag in flags where arguments.filter({ $0 == flag }).count > 1 {
+            throw AppError.invalidArgument("\(flag) 不能重复")
+        }
+        let captures = flags.intersection(["--capture-preview", "--capture-live", "--capture-skin-switch"])
+        let demos = flags.intersection(["--demo", "--demo-pose"])
+        guard captures.count <= 1, demos.count <= 1,
+              !(flags.contains("--smoke-test") && !flags.subtracting(["--smoke-test", "--skin"]).isEmpty),
+              !(demos.count > 0 && captures.contains("--capture-live")),
+              !flags.contains("--capture-after") || !captures.isEmpty else {
+            throw AppError.invalidArgument("自动化参数组合无效")
+        }
+        if let index = arguments.firstIndex(of: "--skin"), PetSkin(rawValue: arguments[index + 1]) == nil {
+            throw AppError.invalidArgument("未知 --skin")
+        }
+        if let index = arguments.firstIndex(of: "--demo-pose"), PetPose(rawValue: arguments[index + 1]) == nil {
+            throw AppError.invalidArgument("未知 --demo-pose")
+        }
+        if let index = arguments.firstIndex(of: "--capture-after") {
+            guard let delay = TimeInterval(arguments[index + 1]), delay.isFinite, (0...60).contains(delay) else {
+                throw AppError.invalidArgument("--capture-after 必须为 0 至 60 秒")
+            }
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = ProcessInfo.processInfo.arguments
         do {
+            try Self.validateAutomationArguments(arguments)
             for skin in PetSkin.allCases {
                 let assets = try PetAssets(skin: skin)
                 try assets.validateAll()
                 assetsBySkin[skin] = assets
             }
             if let index = arguments.firstIndex(of: "--skin"), arguments.indices.contains(index + 1) {
-                guard let skin = PetSkin(rawValue: arguments[index + 1]) else { throw AppError.invalidArgument("未知 --skin") }
-                preferences.skin = skin
+                preferences.skin = PetSkin(rawValue: arguments[index + 1])!
             }
             let assets = assetsBySkin[preferences.skin]!
             if arguments.contains("--smoke-test") {
@@ -58,7 +101,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if let index = arguments.firstIndex(of: "--demo-pose"), arguments.indices.contains(index + 1) {
                 demoPose = PetPose(rawValue: arguments[index + 1])
-                guard demoPose != nil else { throw AppError.invalidArgument("未知 --demo-pose") }
             } else if arguments.contains("--demo") { demoPose = .idle }
             if let index = arguments.firstIndex(of: "--capture-preview"), arguments.indices.contains(index + 1) {
                 capturePath = arguments[index + 1]
@@ -67,26 +109,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let index = arguments.firstIndex(of: "--capture-live"), arguments.indices.contains(index + 1) {
                 capturePath = arguments[index + 1]
                 captureLive = true
-                guard demoPose == nil else { throw AppError.invalidArgument("--capture-live 不能与演示模式同时使用") }
             }
             if let index = arguments.firstIndex(of: "--capture-after"), arguments.indices.contains(index + 1) {
-                guard let delay = TimeInterval(arguments[index + 1]), delay.isFinite, (0...60).contains(delay) else {
-                    throw AppError.invalidArgument("--capture-after 必须为 0 至 60 秒")
-                }
-                captureDelay = delay
+                captureDelay = TimeInterval(arguments[index + 1])!
             }
             if let index = arguments.firstIndex(of: "--capture-skin-switch"), arguments.indices.contains(index + 1) {
                 switchCaptureDirectory = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
                 preferences.skin = .character
             }
             if let index = arguments.firstIndex(of: "--notification-log") {
-                guard arguments.indices.contains(index + 1), !arguments[index + 1].hasPrefix("--") else {
-                    throw AppError.invalidArgument("--notification-log 需要 JSONL 文件路径")
-                }
                 notificationLogPath = arguments[index + 1]
             }
-            let automated = demoPose != nil || capturePath != nil || switchCaptureDirectory != nil || notificationLogPath != nil
-                || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             let notificationAdapter: any PetNotificationAdapter
             if automated {
                 notificationAdapter = try RecordingPetNotificationAdapter(logURL: notificationLogPath.map { URL(fileURLWithPath: $0) })
@@ -99,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             canRequestNotificationAuthorization = !automated
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.status.notificationAuthorization = await notifications.authorization(request: !automated && self.preferences.systemNotifications)
+                self.status.notificationAuthorization = await notifications.authorization(request: !self.automated && self.preferences.systemNotifications)
                 self.refresh()
             }
             let frame = preferences.restoredFrame(size: try assets.requiredPanelSize(characterHeight: preferences.size.characterHeight))
@@ -318,8 +351,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func fail(_ error: Error) {
         fputs("DSHNativePet: \(error.localizedDescription)\n", stderr)
-        let arguments = ProcessInfo.processInfo.arguments
-        if !arguments.contains("--smoke-test") && !arguments.contains("--capture-live") && !arguments.contains("--capture-preview") && !arguments.contains("--capture-skin-switch") && !arguments.contains("--notification-log") {
+        if !automated {
             let alert = NSAlert()
             alert.messageText = "DSH 桌宠无法启动"
             alert.informativeText = error.localizedDescription

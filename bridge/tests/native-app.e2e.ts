@@ -171,7 +171,7 @@ for (const expected of ['waiting', 'completed', 'skin-switch'] as const) {
             processID: number; skin: string; pose: string; storePose: string; source: string;
             connectedSources: number; sessionIDs: string[]; playerActive: boolean; playerReady: boolean;
             footScreenX: number; footScreenY: number; characterHeight: number; videoTime: number;
-            decodedTransparentPixels: number; decodedOpaquePixels: number;
+            decodedTransparentPixels: number; decodedOpaquePixels: number; frame: string; sizePreference: string;
           }
           const png = await readFile(join(captureDirectory, `${name}.png`))
           assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
@@ -188,6 +188,9 @@ for (const expected of ['waiting', 'completed', 'skin-switch'] as const) {
         assert.ok(states.every(s => Number.isFinite(s.footScreenX) && Number.isFinite(s.footScreenY)))
         assert.ok(states.every(s => Math.abs(s.footScreenX - states[0]!.footScreenX) < 0.01
           && Math.abs(s.footScreenY - states[0]!.footScreenY) < 0.01))
+        assert.equal(states[0]!.sizePreference, states[1]!.sizePreference)
+        assert.equal(states[1]!.sizePreference, states[2]!.sizePreference)
+        assert.equal(states[0]!.frame, states[2]!.frame)
         const video = states[1]!
         assert.equal(video.source, 'AVPlayerItemVideoOutput')
         assert.equal(video.playerReady, true)
