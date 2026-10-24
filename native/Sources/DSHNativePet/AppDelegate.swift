@@ -6,19 +6,16 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let store = PetStore()
+    let store = PetStore()
     private let server = UnixSocketServer()
-    private let preferences: PetPreferences = {
-        let automationFlags: Set<String> = ["--smoke-test", "--demo", "--demo-pose", "--capture-preview",
-                                            "--capture-live", "--capture-skin-switch", "--notification-log"]
-        return PetPreferences(persistChanges: !ProcessInfo.processInfo.arguments.contains { automationFlags.contains($0) })
-    }()
-    private let status = PetStatusModel()
-    private var panel: PetPanel?
-    private var petView: PetView?
+    private let automated: Bool
+    let preferences: PetPreferences
+    let status = PetStatusModel()
+    var panel: PetPanel?
+    var petView: PetView?
     private var animator: PetAnimator?
     private var assetsBySkin: [PetSkin: PetAssets] = [:]
-    private var statusMenu: StatusMenu?
+    var statusMenu: StatusMenu?
     private var settingsWindow: NSWindow?
     private var subscriptions: Set<AnyCancellable> = []
     private var timer: Timer?
@@ -28,27 +25,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pokeUntil = Date.distantPast
     private var dragging = false
     private var systemSuspensions: Set<String> = []
-    private var stopped = false
-    private var demoPose: PetPose?
-    private var capturePath: String?
-    private var captureDelay: TimeInterval = 1
+    var stopped = false
+    var demoPose: PetPose?
+    var capturePath: String?
+    var captureDelay: TimeInterval = 1
     private var captureLive = false
-    private var switchCaptureDirectory: URL?
+    var switchCaptureDirectory: URL?
     private var notifications: PetNotificationDispatcher?
     private var notificationLogPath: String?
     private var canRequestNotificationAuthorization = false
 
+    private static let automationFlags: Set<String> = ["--smoke-test", "--demo", "--demo-pose", "--capture-preview",
+                                                       "--capture-live", "--capture-skin-switch", "--capture-after", "--notification-log"]
+
+    override init() {
+        automated = Self.isAutomation(arguments: ProcessInfo.processInfo.arguments, environment: ProcessInfo.processInfo.environment)
+        preferences = PetPreferences(persistChanges: !automated)
+        super.init()
+    }
+
+    static func isAutomation(arguments: [String], environment: [String: String]) -> Bool {
+        arguments.contains { automationFlags.contains($0) } || environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    static func validateAutomationArguments(_ arguments: [String]) throws {
+        let valueFlags: Set<String> = ["--skin", "--demo-pose", "--capture-preview", "--capture-live",
+                                      "--capture-skin-switch", "--capture-after", "--notification-log"]
+        for (index, flag) in arguments.enumerated() where valueFlags.contains(flag) {
+            guard arguments.indices.contains(index + 1), !arguments[index + 1].isEmpty, !arguments[index + 1].hasPrefix("--") else {
+                throw AppError.invalidArgument("\(flag) 需要值")
+            }
+        }
+        let flags = Set(arguments.filter { automationFlags.contains($0) || $0 == "--skin" })
+        for flag in flags where arguments.filter({ $0 == flag }).count > 1 {
+            throw AppError.invalidArgument("\(flag) 不能重复")
+        }
+        let captures = flags.intersection(["--capture-preview", "--capture-live", "--capture-skin-switch"])
+        let demos = flags.intersection(["--demo", "--demo-pose"])
+        guard captures.count <= 1, demos.count <= 1,
+              !(flags.contains("--smoke-test") && !flags.subtracting(["--smoke-test", "--skin"]).isEmpty),
+              !(demos.count > 0 && captures.contains("--capture-live")),
+              !flags.contains("--capture-after") || !captures.isEmpty else {
+            throw AppError.invalidArgument("自动化参数组合无效")
+        }
+        if let index = arguments.firstIndex(of: "--skin"), PetSkin(rawValue: arguments[index + 1]) == nil {
+            throw AppError.invalidArgument("未知 --skin")
+        }
+        if let index = arguments.firstIndex(of: "--demo-pose"), PetPose(rawValue: arguments[index + 1]) == nil {
+            throw AppError.invalidArgument("未知 --demo-pose")
+        }
+        if let index = arguments.firstIndex(of: "--capture-after") {
+            guard let delay = TimeInterval(arguments[index + 1]), delay.isFinite, (0...60).contains(delay) else {
+                throw AppError.invalidArgument("--capture-after 必须为 0 至 60 秒")
+            }
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = ProcessInfo.processInfo.arguments
         do {
+            try Self.validateAutomationArguments(arguments)
             for skin in PetSkin.allCases {
                 let assets = try PetAssets(skin: skin)
                 try assets.validateAll()
                 assetsBySkin[skin] = assets
             }
             if let index = arguments.firstIndex(of: "--skin"), arguments.indices.contains(index + 1) {
-                guard let skin = PetSkin(rawValue: arguments[index + 1]) else { throw AppError.invalidArgument("未知 --skin") }
-                preferences.skin = skin
+                preferences.skin = PetSkin(rawValue: arguments[index + 1])!
             }
             let assets = assetsBySkin[preferences.skin]!
             if arguments.contains("--smoke-test") {
@@ -58,7 +101,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if let index = arguments.firstIndex(of: "--demo-pose"), arguments.indices.contains(index + 1) {
                 demoPose = PetPose(rawValue: arguments[index + 1])
-                guard demoPose != nil else { throw AppError.invalidArgument("未知 --demo-pose") }
             } else if arguments.contains("--demo") { demoPose = .idle }
             if let index = arguments.firstIndex(of: "--capture-preview"), arguments.indices.contains(index + 1) {
                 capturePath = arguments[index + 1]
@@ -67,26 +109,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let index = arguments.firstIndex(of: "--capture-live"), arguments.indices.contains(index + 1) {
                 capturePath = arguments[index + 1]
                 captureLive = true
-                guard demoPose == nil else { throw AppError.invalidArgument("--capture-live 不能与演示模式同时使用") }
             }
             if let index = arguments.firstIndex(of: "--capture-after"), arguments.indices.contains(index + 1) {
-                guard let delay = TimeInterval(arguments[index + 1]), delay.isFinite, (0...60).contains(delay) else {
-                    throw AppError.invalidArgument("--capture-after 必须为 0 至 60 秒")
-                }
-                captureDelay = delay
+                captureDelay = TimeInterval(arguments[index + 1])!
             }
             if let index = arguments.firstIndex(of: "--capture-skin-switch"), arguments.indices.contains(index + 1) {
                 switchCaptureDirectory = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
                 preferences.skin = .character
             }
             if let index = arguments.firstIndex(of: "--notification-log") {
-                guard arguments.indices.contains(index + 1), !arguments[index + 1].hasPrefix("--") else {
-                    throw AppError.invalidArgument("--notification-log 需要 JSONL 文件路径")
-                }
                 notificationLogPath = arguments[index + 1]
             }
-            let automated = demoPose != nil || capturePath != nil || switchCaptureDirectory != nil || notificationLogPath != nil
-                || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             let notificationAdapter: any PetNotificationAdapter
             if automated {
                 notificationAdapter = try RecordingPetNotificationAdapter(logURL: notificationLogPath.map { URL(fileURLWithPath: $0) })
@@ -99,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             canRequestNotificationAuthorization = !automated
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.status.notificationAuthorization = await notifications.authorization(request: !automated && self.preferences.systemNotifications)
+                self.status.notificationAuthorization = await notifications.authorization(request: !self.automated && self.preferences.systemNotifications)
                 self.refresh()
             }
             let frame = preferences.restoredFrame(size: try assets.requiredPanelSize(characterHeight: preferences.size.characterHeight))
@@ -172,22 +205,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             onError: { [weak self] error in self?.status.connectionError = error },
-            onReady: { [weak self] in self?.status.connectionError = nil })
+            onReady: { [weak self] in self?.status.connectionError = nil },
+            onIncompatible: { [weak self] in self?.status.protocolWarning = $0 })
         do {
             try server.start(onMessage: { events.enqueue(.message($0)) },
                              onDisconnect: { events.enqueue(.disconnect($0)) },
                              onError: { events.enqueue(.listenerError($0)) },
-                             onReady: { events.enqueue(.ready) })
+                             onReady: { events.enqueue(.ready) },
+                             onIncompatible: { events.enqueue(.incompatible($0)) })
         } catch PetIPCError.alreadyRunning {
             print("DSHNativePet: already running; second instance exits")
             shutdown()
             NSApp.terminate(nil)
             return false
-        } catch { status.connectionError = error.localizedDescription }
+        } catch {
+            fail(error)
+            return false
+        }
         return true
     }
 
-    private func applyPreferences() {
+    func applyPreferences() {
         guard let panel else { return }
         if capturePath == nil {
             guard let assets = assetsBySkin[preferences.skin] else { return }
@@ -214,7 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let presentation = store.presentation(at: now)
         status.update(presentation)
         statusMenu?.update(summary: status.summary, error: status.connectionError,
-                           sourceLabels: status.sourceLabels, authorization: status.notificationAuthorization)
+                           sourceLabels: status.sourceLabels, authorization: status.notificationAuthorization,
+                           protocolWarning: status.protocolWarning)
         if presentation.activeCount > 0 || presentation.waitingCount > 0 || [.completed, .error].contains(presentation.pose) {
             lastActivity = now
         }
@@ -240,11 +279,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if pose == .sleeping {
             return presentation.connectedSources == 0 ? "休息中 · 暂无宿主状态" : "休息中"
         }
-        if presentation.activeCount > 0 {
-            return presentation.text
-                .replacingOccurrences(of: "：本轮回应已结束，", with: "\n本轮结束 · ")
-                .replacingOccurrences(of: " 个会话仍在执行", with: " 执行中")
-                .replacingOccurrences(of: " 个会话仍在思考", with: " 思考中")
+        if presentation.activeCount > 0, let feedback = presentation.feedback, feedback.pose == .completed,
+           pose == .working || pose == .thinking {
+            let remaining = "\(presentation.activeCount) " + (pose == .working ? "执行中" : "思考中")
+            if let source = feedback.sourceLabel { return "\(source)\n本轮结束 · \(remaining)" }
+            return "\(feedback.text)，\(remaining)"
         }
         return presentation.text
     }
@@ -310,108 +349,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func screensChanged(_ notification: Notification) { panel?.constrainToScreens(); savePosition() }
 
-    private func capturePreview() {
-        guard let capturePath else { return }
-        do {
-            try writeCapture(to: URL(fileURLWithPath: capturePath))
-            NSApp.terminate(nil)
-        } catch { fail(error) }
-    }
-
-    private func captureSkinSwitch() {
-        guard let directory = switchCaptureDirectory else { return }
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                let originalFrame = self.panel?.frame
-                let originalFoot = self.panel.map { NSPoint(x: $0.frame.midX, y: $0.frame.minY + 8) }
-                let originalSizePreference = self.preferences.size
-                for (index, skin) in [PetSkin.character, .dshPet, .character].enumerated() {
-                    self.statusMenu?.selectSkin(skin)
-                    self.applyPreferences()
-                    try await Task.sleep(for: .seconds(max(1.5, self.captureDelay)))
-                    guard !self.stopped else { return }
-                    let foot = self.panel.map { NSPoint(x: $0.frame.midX, y: $0.frame.minY + 8) }
-                    guard foot == originalFoot, self.preferences.size == originalSizePreference else {
-                        throw AppError.invalidArgument("换肤改变了脚底坐标或尺寸偏好")
-                    }
-                    if index == 2, self.panel?.frame != originalFrame {
-                        throw AppError.invalidArgument("切回小女孩后窗口未恢复")
-                    }
-                    try self.writeCapture(to: directory.appendingPathComponent("\(index + 1)-\(skin.rawValue).png"))
-                }
-                NSApp.terminate(nil)
-            } catch { self.fail(error) }
-        }
-    }
-
-    private func writeCapture(to url: URL) throws {
-        guard let view = petView, let panel else { throw AppError.invalidArgument("桌宠窗口尚未创建") }
-        view.layoutSubtreeIfNeeded()
-        let decoded = view.videoPlayback.decodedFrame()
-        if view.videoPlayback.isActive, decoded == nil {
-            throw AppError.invalidArgument("视频尚无可读取的实际解码帧")
-        }
-        let savedContents = view.characterLayer.contents
-        let videoHidden = view.videoPlayback.videoLayer?.isHidden
-        if let decoded {
-            view.characterLayer.contents = decoded.image
-            view.videoPlayback.videoLayer?.isHidden = true
-        }
-        defer {
-            view.characterLayer.contents = savedContents
-            if let videoHidden { view.videoPlayback.videoLayer?.isHidden = videoHidden }
-        }
-        CATransaction.flush()
-        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
-            throw AppError.invalidArgument("无法创建窗口截图")
-        }
-        view.cacheDisplay(in: view.bounds, to: bitmap)
-        guard let png = bitmap.representation(using: .png, properties: [:]) else {
-            throw AppError.invalidArgument("无法编码窗口截图")
-        }
-        try png.write(to: url)
-        let presentation = store.presentation()
-        let evidence: [String: Any] = [
-            "processID": ProcessInfo.processInfo.processIdentifier,
-            "skin": view.skin.rawValue,
-            "pose": view.currentPose?.rawValue ?? "",
-            "source": decoded == nil ? "poster" : "AVPlayerItemVideoOutput",
-            "videoTime": decoded?.time ?? 0,
-            "decodedTransparentPixels": decoded?.transparentPixels ?? 0,
-            "decodedOpaquePixels": decoded?.opaquePixels ?? 0,
-            "playerActive": view.videoPlayback.isActive,
-            "playerReady": view.videoPlayback.hasDecodedFrame,
-            "characterHeight": view.characterHeight,
-            "sizePreference": preferences.size.rawValue,
-            "footPosition": NSStringFromPoint(NSPoint(x: panel.frame.midX, y: panel.frame.minY + 8)),
-            "footScreenX": panel.frame.midX,
-            "footScreenY": panel.frame.minY + 8,
-            "frame": NSStringFromRect(panel.frame),
-            "connectedSources": presentation.connectedSources,
-            "sessionIDs": presentation.sessions.map(\.sessionId),
-            "sourceLabels": status.sourceLabels,
-            "sessions": presentation.sessions.map { ["sourceId": $0.sourceId, "sourceLabel": $0.sourceLabel,
-                                                      "sessionId": $0.sessionId, "phase": $0.phase.rawValue,
-                                                      "isStale": $0.isStale] as [String: Any] },
-            "notificationRequestCount": notifications?.requestCount ?? 0,
-            "notificationAuthorization": status.notificationAuthorization.rawValue,
-            "systemNotifications": preferences.systemNotifications,
-            "storePose": presentation.pose.rawValue,
-            "presentationText": presentation.text,
-            "displayText": view.subviews.compactMap { $0 as? NSTextField }.first?.stringValue ?? "",
-        ]
-        try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
-            .write(to: url.deletingPathExtension().appendingPathExtension("json"))
-        print("Preview captured from live PetPanel: \(url.path); state=\(demoPose?.rawValue ?? presentation.pose.rawValue); skin=\(view.skin.rawValue); pose=\(view.currentPose?.rawValue ?? ""); source=\(decoded == nil ? "poster" : "AVPlayerItemVideoOutput"); videoTime=\(decoded?.time ?? 0); playerActive=\(view.videoPlayback.isActive)")
-        fflush(stdout)
-    }
-
-    private func fail(_ error: Error) {
+    func fail(_ error: Error) {
         fputs("DSHNativePet: \(error.localizedDescription)\n", stderr)
-        let arguments = ProcessInfo.processInfo.arguments
-        if !arguments.contains("--smoke-test") && !arguments.contains("--capture-live") && !arguments.contains("--capture-preview") && !arguments.contains("--capture-skin-switch") && !arguments.contains("--notification-log") {
+        if !automated {
             let alert = NSAlert()
             alert.messageText = "DSH 桌宠无法启动"
             alert.informativeText = error.localizedDescription

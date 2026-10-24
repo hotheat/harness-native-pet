@@ -17,13 +17,49 @@ struct ActivityStoreTests {
         let stop = event(.turnEnded, id: "stop")
         store.apply(stop, at: now)
         store.apply(stop, at: now)
-        store.apply(event(.turnEnded, id: "different-stop"), at: now)
+        store.apply(event(.turnEnded, id: "different-stop", time: 1001), at: now.addingTimeInterval(1))
         let notices = store.drainNotices(at: now)
         #expect(notices.count == 1)
         #expect(notices.first?.kind == .ended)
         #expect(notices.first?.sourceLabel == "Codex")
         #expect(notices.first?.body == "本轮回应已结束")
         #expect(store.drainNotices(at: now).isEmpty)
+    }
+
+    @Test func stopThenFailureNotifiesErrorOnceAndUpdatesFeedback() {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        #expect(store.drainNotices(at: now).map(\.kind) == [.ended])
+        store.apply(event(.failed, id: "failure", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.error])
+        let presentation = store.presentation(at: now.addingTimeInterval(1))
+        #expect(presentation.pose == .error)
+        #expect(presentation.feedback?.pose == .error)
+        #expect(presentation.feedback?.text == "本轮回应出错，请查看 Codex")
+        store.apply(event(.failed, id: "failure-again", time: 1002), at: now.addingTimeInterval(2))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
+    }
+
+    @Test func stopThenInterruptNotifiesInterruptedOnceAndUpdatesFeedback() {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        #expect(store.drainNotices(at: now).map(\.kind) == [.ended])
+        store.apply(event(.interrupted, id: "interrupt", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.interrupted])
+        let presentation = store.presentation(at: now.addingTimeInterval(1))
+        #expect(presentation.pose == .idle)
+        #expect(presentation.sessions.first?.phase == .stopped)
+        #expect(presentation.feedback?.text == "本轮回应已中断")
+        store.apply(event(.interrupted, id: "interrupt-again", time: 1002), at: now.addingTimeInterval(2))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
+    }
+
+    @Test func repeatedFailuresWithDifferentEventIDsNotifyOnce() {
+        let store = PetStore()
+        store.apply(event(.failed, id: "failure"), at: now)
+        store.apply(event(.failed, id: "failure-again", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.error])
+        #expect(store.presentation(at: now.addingTimeInterval(1)).pose == .error)
     }
 
     @Test func sessionStartIsIdleAndSameSessionAcrossProvidersIsDistinct() {
@@ -53,12 +89,12 @@ struct ActivityStoreTests {
         #expect(store.presentation(at: now).sessions.first?.activeTools == 0)
     }
 
-    @Test func endedTurnCannotBeReactivatedAndOldTurnCannotEndNewTurn() {
+    @Test func stopResumesButOldTurnCannotEndNewTurn() {
         let store = PetStore()
         store.apply(event(.turnStarted), at: now)
         store.apply(event(.turnEnded), at: now)
         store.apply(event(.toolStarted, tool: "late", time: 1001), at: now)
-        #expect(store.presentation(at: now).pose == .completed)
+        #expect(store.presentation(at: now).pose == .working)
         store.apply(event(.turnStarted, turn: "t2", time: 1002), at: now)
         store.apply(event(.turnEnded, turn: "t1", time: 1003), at: now)
         store.apply(event(.toolStarted, turn: "t1", tool: "late", time: 1004), at: now)
@@ -174,4 +210,91 @@ struct ActivityStoreTests {
         #expect(value.sessions.count <= 256)
         #expect(value.sessions.contains { $0.sessionId == "active" && $0.phase == .thinking })
     }
+    @Test func stopActivityStopNotifiesAgainAndClearsFeedback() {
+        for kind in [PetActivityKind.running, .toolStarted, .toolFinished, .waiting] {
+            let store = PetStore()
+            store.apply(event(.turnEnded), at: now)
+            #expect(store.drainNotices(at: now).count == 1)
+            store.apply(event(kind, tool: kind == .toolStarted || kind == .toolFinished ? "work" : nil, time: 1001), at: now.addingTimeInterval(1))
+            let resumed = store.presentation(at: now.addingTimeInterval(1.31))
+            #expect(resumed.sessions.first?.result == nil)
+            #expect(!resumed.text.contains("结束"))
+            #expect(resumed.pose == (kind == .waiting ? .waiting : kind == .running || kind == .toolStarted ? .working : .thinking))
+            store.apply(event(.turnEnded, time: 1002), at: now.addingTimeInterval(2))
+            #expect(store.drainNotices(at: now.addingTimeInterval(2)).map(\.kind) == [.ended])
+        }
+    }
+
+    @Test func oldActivityAndFailedOrInterruptedTurnsCannotResume() {
+        for terminal in [PetActivityKind.turnEnded, .failed, .interrupted] {
+            let store = PetStore()
+            store.apply(event(.turnStarted), at: now)
+            store.apply(event(terminal, time: 1002), at: now)
+            _ = store.drainNotices(at: now)
+            for kind in [PetActivityKind.running, .toolStarted, .toolFinished, .waiting] {
+                store.apply(event(kind, tool: "old", time: terminal == .turnEnded ? 1001 : 1003), at: now)
+            }
+            #expect(store.presentation(at: now).sessions.first?.phase == (terminal == .failed ? .error : terminal == .interrupted ? .stopped : .completed))
+            #expect(store.drainNotices(at: now.addingTimeInterval(1)).isEmpty)
+        }
+    }
+
+    @Test func unknownTurnsDoNotChangeStateOrRefreshReceiptTime() {
+        let store = PetStore()
+        store.apply(event(.turnStarted, turn: "t2"), at: now)
+        for turn in ["t0", "t3"] {
+            for kind in [PetActivityKind.toolStarted, .toolFinished, .waiting, .turnEnded, .failed, .interrupted] {
+                store.apply(event(kind, turn: turn, tool: kind == .toolStarted || kind == .toolFinished ? "alien" : nil, time: 1001), at: now.addingTimeInterval(899))
+            }
+        }
+        #expect(store.presentation(at: now).pose == .thinking)
+        #expect(store.presentation(at: now.addingTimeInterval(901)).sessions.first?.isStale == true)
+        #expect(store.drainNotices(at: now.addingTimeInterval(901)).isEmpty)
+    }
+
+    @Test func sessionStartCanEstablishTurnFromAnyFirstFact() {
+        for kind in [PetActivityKind.toolStarted, .waiting, .turnEnded] {
+            for time in [999.0, 1001.0] {
+                let store = PetStore()
+                store.apply(event(.sessionStarted, turn: nil), at: now)
+                store.apply(event(kind, turn: "first", tool: kind == .toolStarted ? "tool" : nil, time: time), at: now)
+                #expect(store.presentation(at: now.addingTimeInterval(1)).sessions.first?.phase == (kind == .toolStarted ? .working : kind == .waiting ? .waiting : .completed))
+            }
+        }
+    }
+
+    @Test func terminalFactsAcceptEarlierPhaseTimestamp() {
+        for kind in [PetActivityKind.turnEnded, .failed, .interrupted] {
+            let store = PetStore()
+            store.apply(event(.turnStarted), at: now)
+            store.apply(event(.waiting, time: 1003), at: now)
+            store.apply(event(kind, time: 1002), at: now)
+            #expect(store.presentation(at: now).sessions.first?.phase == (kind == .failed ? .error : kind == .interrupted ? .stopped : .completed))
+            #expect(store.drainNotices(at: now).count == 1)
+            if kind == .turnEnded {
+                store.apply(event(.running, time: 1002.5), at: now)
+                #expect(store.presentation(at: now).pose == .completed)
+                store.apply(event(.running, time: 1003), at: now)
+                #expect(store.presentation(at: now).pose == .working)
+            }
+        }
+    }
+
+    @Test func terminalHistoryExpiresWithoutBecomingStale() {
+        for kind in [PetActivityKind.turnEnded, .failed, .interrupted] {
+            let store = PetStore()
+            store.apply(event(kind), at: now)
+            let visible = store.presentation(at: now.addingTimeInterval(899))
+            #expect(visible.sessions.count == 1)
+            #expect(visible.sessions.first?.isStale == false)
+            #expect(visible.connectedSources == 1)
+            let expired = store.presentation(at: now.addingTimeInterval(901))
+            #expect(expired.sessions.isEmpty)
+            #expect(expired.connectedSources == 0)
+            #expect(expired.text == "未连接宿主")
+            store.apply(event(kind), at: now.addingTimeInterval(902))
+            #expect(store.drainNotices(at: now.addingTimeInterval(902)).count == 1)
+        }
+    }
+
 }

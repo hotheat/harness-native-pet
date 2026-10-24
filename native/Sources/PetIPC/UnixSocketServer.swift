@@ -32,6 +32,7 @@ public final class UnixSocketServer: @unchecked Sendable {
     private var onMessage: (@Sendable (BridgeMessage) -> Void)?
     private var onDisconnect: (@Sendable (String) -> Void)?
     private var onError: (@Sendable (String) -> Void)?
+    private var onIncompatible: (@Sendable (String) -> Void)?
 
     public var socketPath: String { runtime.socketPath }
 
@@ -43,7 +44,8 @@ public final class UnixSocketServer: @unchecked Sendable {
     public func start(onMessage: @escaping @Sendable (BridgeMessage) -> Void,
                       onDisconnect: @escaping @Sendable (String) -> Void,
                       onError: @escaping @Sendable (String) -> Void = { _ in },
-                      onReady: @escaping @Sendable () -> Void = {}) throws {
+                      onReady: @escaping @Sendable () -> Void = {},
+                      onIncompatible: @escaping @Sendable (String) -> Void = { _ in }) throws {
         try synchronized {
             guard self.listener == nil else { throw PetIPCError.alreadyStarted }
             try runtime.prepare()
@@ -75,6 +77,7 @@ public final class UnixSocketServer: @unchecked Sendable {
                 self.onMessage = onMessage
                 self.onDisconnect = onDisconnect
                 self.onError = onError
+                self.onIncompatible = onIncompatible
                 listener.setEventHandler { [weak self] in
                     guard let self, self.generation == generation else { return }
                     self.acceptClients()
@@ -117,6 +120,7 @@ public final class UnixSocketServer: @unchecked Sendable {
         onMessage = nil
         onDisconnect = nil
         onError = nil
+        onIncompatible = nil
     }
 
     private func makeNonblocking(_ fd: Int32) throws {
@@ -167,6 +171,10 @@ public final class UnixSocketServer: @unchecked Sendable {
                     guard client.buffer.count <= BridgeMessage.maximumLineBytes else {
                         throw BridgeMessageError.invalid("unterminated message too large")
                     }
+                } catch BridgeMessageError.unsupportedVersion {
+                    onIncompatible?("有组件协议版本不兼容，请更新 DSH 插件或重新安装宿主接入")
+                    finalize(client)
+                    return
                 } catch { finalize(client); return }
                 continue
             }
@@ -176,7 +184,9 @@ public final class UnixSocketServer: @unchecked Sendable {
             }
             if !client.buffer.isEmpty {
                 do { try consume(BridgeMessage.decode(client.buffer), from: client) }
-                catch { /* Incomplete/invalid final frames are discarded. */ }
+                catch BridgeMessageError.unsupportedVersion {
+                    onIncompatible?("有组件协议版本不兼容，请更新 DSH 插件或重新安装宿主接入")
+                } catch { /* Incomplete/invalid final frames are discarded. */ }
             }
             finalize(client)
         }

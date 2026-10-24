@@ -21,7 +21,17 @@ export interface SourceSnapshot {
   sessions: SessionSnapshot[]
 }
 export interface Heartbeat { type: 'heartbeat'; sourceId: string; seq: number }
-export type BridgeMessage = SourceSnapshot | Heartbeat
+export interface ActivityEvent {
+  type: 'activity'
+  provider: 'codex' | 'claudeCode'
+  sessionId: string
+  turnId: string | null
+  eventId: string
+  kind: 'sessionStarted' | 'turnStarted' | 'toolStarted' | 'toolFinished' | 'waiting' | 'running' | 'turnEnded' | 'failed' | 'interrupted' | 'sessionEnded'
+  occurredAt: number
+  toolId: string | null
+}
+export type BridgeMessage = SourceSnapshot | Heartbeat | ActivityEvent
 
 const phases = new Set<string>(['idle', 'running', 'thinking', 'working', 'waiting', 'completed', 'error', 'stopped'])
 const outcomes = new Set<string>(['completed', 'error', 'aborted', 'blocked', 'max-tokens', 'other'])
@@ -29,7 +39,7 @@ const nonempty = (value: unknown): value is string => typeof value === 'string' 
 const natural = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 function object(value: unknown, keys: string[]): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key))
+    && keys.every(key => Object.hasOwn(value, key))
 }
 function validSession(value: unknown): boolean {
   if (!object(value, ['sessionId', 'turn', 'phase', 'activeTools', 'pendingApprovals', 'result'])) return false
@@ -43,14 +53,31 @@ function validSession(value: unknown): boolean {
 /** Validate at the wire boundary; contract fixtures keep both language decoders aligned. */
 export function decodeMessage(value: unknown): BridgeMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) throw new Error('Invalid desktop pet message')
+  if ('v' in value && value.v !== 1) throw new Error('Unsupported desktop pet protocol version')
+  if (value.type === 'activity') {
+    if (!object(value, ['type', 'provider', 'sessionId', 'turnId', 'eventId', 'kind', 'occurredAt', 'toolId'])) throw new Error('Invalid desktop pet activity fields')
+    const activity = value as Record<string, unknown>
+    if (typeof activity.provider !== 'string' || !['codex', 'claudeCode'].includes(activity.provider) || !nonempty(activity.sessionId) || !nonempty(activity.eventId)
+      || !(activity.turnId === null || nonempty(activity.turnId)) || !(activity.toolId === null || nonempty(activity.toolId))
+      || typeof activity.kind !== 'string' || !['sessionStarted', 'turnStarted', 'toolStarted', 'toolFinished', 'waiting', 'running', 'turnEnded', 'failed', 'interrupted', 'sessionEnded'].includes(activity.kind)
+      || typeof activity.occurredAt !== 'number' || !Number.isFinite(activity.occurredAt) || activity.occurredAt < 0) throw new Error('Invalid desktop pet activity')
+    return { type: 'activity', provider: activity.provider, sessionId: activity.sessionId, turnId: activity.turnId,
+      eventId: activity.eventId, kind: activity.kind, occurredAt: activity.occurredAt, toolId: activity.toolId } as ActivityEvent
+  }
   const snapshot = value.type === 'snapshot'
   if (!(snapshot ? object(value, ['type', 'sourceId', 'sourceLabel', 'seq', 'sessions'])
     : value.type === 'heartbeat' && object(value, ['type', 'sourceId', 'seq']))) throw new Error('Invalid desktop pet message fields')
   const fields = value as Record<string, unknown>
   if (!nonempty(fields.sourceId) || fields.sourceId.startsWith('hook:') || !natural(fields.seq) || fields.seq === 0) throw new Error('Invalid desktop pet source or sequence')
-  if (snapshot && (!nonempty(fields.sourceLabel) || !Array.isArray(fields.sessions)
-    || !fields.sessions.every(validSession))) throw new Error('Invalid desktop pet session snapshot')
-  return value as BridgeMessage
+  if (!snapshot) return { type: 'heartbeat', sourceId: fields.sourceId, seq: fields.seq }
+  if (!nonempty(fields.sourceLabel) || !Array.isArray(fields.sessions)
+    || !fields.sessions.every(validSession)) throw new Error('Invalid desktop pet session snapshot')
+  const sessions = (fields.sessions as SessionSnapshot[]).map(session => ({
+    sessionId: session.sessionId, turn: session.turn, phase: session.phase,
+    activeTools: session.activeTools, pendingApprovals: session.pendingApprovals,
+    result: session.result === null ? null : { id: session.result.id, outcome: session.result.outcome },
+  }))
+  return { type: 'snapshot', sourceId: fields.sourceId, sourceLabel: fields.sourceLabel, seq: fields.seq, sessions }
 }
 
 export function socketPath(runtimeDirectory = process.env.DSH_NATIVE_PET_RUNTIME_DIR): string {
@@ -58,7 +85,6 @@ export function socketPath(runtimeDirectory = process.env.DSH_NATIVE_PET_RUNTIME
 }
 
 export function encodeMessage(message: BridgeMessage): string {
-  decodeMessage(message)
   const json = JSON.stringify(message)
   if (Buffer.byteLength(json, 'utf8') > MAX_LINE_BYTES) throw new Error('Desktop pet snapshot exceeds 262144 bytes')
   return `${json}\n`

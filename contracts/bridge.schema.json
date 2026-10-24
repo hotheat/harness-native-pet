@@ -4,7 +4,7 @@
   "oneOf": [
     {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": [
         "type",
         "sourceId",
@@ -34,7 +34,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "additionalProperties": false,
+            "additionalProperties": true,
             "required": [
               "sessionId",
               "turn",
@@ -86,7 +86,7 @@
                 "anyOf": [
                   {
                     "type": "object",
-                    "additionalProperties": false,
+                    "additionalProperties": true,
                     "required": [
                       "id",
                       "outcome"
@@ -115,12 +115,16 @@
               }
             }
           }
+        },
+        "v": {
+          "type": "integer",
+          "const": 1
         }
       }
     },
     {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": [
         "type",
         "sourceId",
@@ -139,12 +143,16 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "v": {
+          "type": "integer",
+          "const": 1
         }
       }
     },
     {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": [
         "type",
         "provider",
@@ -204,6 +212,10 @@
             "null"
           ],
           "minLength": 1
+        },
+        "v": {
+          "type": "integer",
+          "const": 1
         }
       }
     }

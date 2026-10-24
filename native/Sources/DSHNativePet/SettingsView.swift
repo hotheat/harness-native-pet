@@ -7,6 +7,7 @@ final class PetStatusModel: ObservableObject {
     @Published var summary = "暂无宿主状态"
     @Published var sessionRows: [SessionRow] = []
     @Published var connectionError: String?
+    @Published var protocolWarning: String?
     @Published var notificationAuthorization: PetNotificationAuthorization = .notDetermined
     @Published var notificationError: String?
     @Published var sourceLabels: [String] = []
@@ -73,6 +74,9 @@ struct SettingsView: View {
                 Text(status.summary)
                 if let error = status.connectionError {
                     Text(error).foregroundStyle(.red).textSelection(.enabled)
+                }
+                if let warning = status.protocolWarning {
+                    Text(warning).foregroundStyle(.orange).textSelection(.enabled)
                 }
                 Text("Codex 和 Claude Code 通过附带的 pet-hook 接入，需安装并配置宿主 hooks。")
                     .font(.caption).foregroundStyle(.secondary)

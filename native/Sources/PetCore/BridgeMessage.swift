@@ -2,6 +2,7 @@ import Foundation
 
 public enum BridgeMessageError: Error, Equatable {
     case invalid(String)
+    case unsupportedVersion
 }
 
 public enum BridgeMessage: Sendable {
@@ -31,10 +32,15 @@ public enum BridgeMessage: Sendable {
     public static func decode(_ data: Data) throws -> BridgeMessage {
         guard data.count <= maximumLineBytes else { throw BridgeMessageError.invalid("message too large") }
         let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if raw?.keys.contains("v") == true {
+            guard let version = try? JSONDecoder().decode(WireVersion.self, from: data), version.v == 1 else {
+                throw BridgeMessageError.unsupportedVersion
+            }
+        }
         if raw?["type"] as? String == "activity" {
             let fields: Set<String> = ["type", "provider", "sessionId", "turnId", "eventId", "kind", "occurredAt", "toolId"]
-            guard let raw, Set(raw.keys) == fields else {
-                throw BridgeMessageError.invalid("missing or unexpected activity fields")
+            guard let raw, fields.isSubset(of: Set(raw.keys)) else {
+                throw BridgeMessageError.invalid("missing activity fields")
             }
             let event = try JSONDecoder().decode(PetActivityEvent.self, from: data)
             try validateID(event.sessionId, name: "sessionId")
@@ -92,6 +98,10 @@ public enum BridgeMessage: Sendable {
     }
 }
 
+private struct WireVersion: Decodable {
+    let v: Int
+}
+
 private struct WireMessage: Decodable {
     let type: String
     let sourceId: String
@@ -108,13 +118,13 @@ private struct WireMessage: Decodable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         type = try values.decode(String.self, forKey: .type)
         let expected: Set<String> = type == "heartbeat" ? ["type", "sourceId", "seq"] : ["type", "sourceId", "sourceLabel", "seq", "sessions"]
-        guard Set(raw.allKeys.map(\.stringValue)) == expected else {
-            throw BridgeMessageError.invalid("missing or unexpected message fields")
+        guard expected.isSubset(of: Set(raw.allKeys.map(\.stringValue))) else {
+            throw BridgeMessageError.invalid("missing message fields")
         }
         sourceId = try values.decode(String.self, forKey: .sourceId)
-        sourceLabel = try values.decodeIfPresent(String.self, forKey: .sourceLabel)
+        sourceLabel = type == "snapshot" ? try values.decode(String.self, forKey: .sourceLabel) : nil
         seq = try values.decode(Int.self, forKey: .seq)
-        sessions = try values.decodeIfPresent([SessionSnapshot].self, forKey: .sessions)
+        sessions = type == "snapshot" ? try values.decode([SessionSnapshot].self, forKey: .sessions) : nil
     }
 }
 

@@ -28,10 +28,8 @@ struct ContractTests {
 
     @Test func strictBoundaryCases() throws {
         let invalid = [
-            #"{"type":"heartbeat","sourceId":"a","seq":1,"sessions":null}"#,
             #"{"type":"heartbeat","sourceId":"a","seq":true}"#,
             #"{"type":"snapshot","sourceId":"a","sourceLabel":"DSH","seq":1,"sessions":[{"sessionId":"s","turn":null,"phase":"idle","activeTools":0,"pendingApprovals":0}]}"#,
-            #"{"type":"snapshot","sourceId":"a","sourceLabel":"DSH","seq":1,"sessions":[{"sessionId":"s","turn":null,"phase":"completed","activeTools":0,"pendingApprovals":0,"result":{"id":"r","outcome":"completed","text":"private"}}]}"#,
         ]
         for line in invalid { #expect(throws: (any Error).self) { try BridgeMessage.decode(Data(line.utf8)) } }
         #expect(throws: (any Error).self) { try BridgeMessage.decode(Data(repeating: 32, count: 262_145)) }
@@ -45,7 +43,7 @@ struct ContractTests {
         #expect(object["result"] is NSNull)
     }
 
-    @Test func activityBoundaryRequiresExactFieldsAndReservesHookSources() throws {
+    @Test func activityBoundaryRequiresFieldsAndReservesHookSources() throws {
         let event = PetActivityEvent(provider: .codex, sessionId: "s", turnId: nil,
                                      eventId: "e", kind: .sessionStarted, occurredAt: 1000, toolId: nil)
         let data = try JSONEncoder().encode(event)
@@ -58,7 +56,7 @@ struct ContractTests {
         for (key, value) in [("provider", "unknown" as Any), ("kind", "unknown" as Any),
                              ("sessionId", "" as Any), ("turnId", "" as Any),
                              ("toolId", "" as Any), ("eventId", "" as Any),
-                             ("occurredAt", -1 as Any), ("privateText", "secret" as Any)] {
+                             ("occurredAt", -1 as Any)] {
             var invalid = object
             invalid[key] = value
             #expect(throws: (any Error).self) { try BridgeMessage.decode(JSONSerialization.data(withJSONObject: invalid)) }
@@ -69,4 +67,13 @@ struct ContractTests {
             try BridgeMessage.decode(Data(#"{"type":"snapshot","sourceId":"hook:codex","sourceLabel":"DSH","seq":1,"sessions":[]}"#.utf8))
         }
     }
+    @Test func unsupportedVersionsHaveDistinctError() throws {
+        for version in ["2", "null", "\"1\"", "true", "1.5"] {
+            for type in ["heartbeat", "snapshot", "activity"] {
+                let data = Data("{\"type\":\"\(type)\",\"v\":\(version)}".utf8)
+                #expect(throws: BridgeMessageError.unsupportedVersion) { try BridgeMessage.decode(data) }
+            }
+        }
+    }
+
 }

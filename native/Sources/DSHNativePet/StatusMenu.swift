@@ -9,6 +9,7 @@ final class StatusMenu: NSObject {
     private let notificationStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let notificationItem = NSMenuItem(title: "系统通知", action: #selector(toggleNotifications), keyEquivalent: "")
     private(set) var sourceSummary = "来源：无"
+    private let protocolItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let errorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let visibleItem = NSMenuItem(title: "显示桌宠", action: #selector(toggleVisible), keyEquivalent: "")
     private let throughItem = NSMenuItem(title: "点击穿透", action: #selector(toggleThrough), keyEquivalent: "")
@@ -29,6 +30,8 @@ final class StatusMenu: NSObject {
         menu.addItem(sourceItem)
         errorItem.isHidden = true
         menu.addItem(errorItem)
+        protocolItem.isHidden = true
+        menu.addItem(protocolItem)
         menu.addItem(.separator())
         for item in [visibleItem, throughItem, animationItem, notificationItem] { item.target = self; menu.addItem(item) }
         menu.addItem(notificationStatusItem)
@@ -67,7 +70,7 @@ final class StatusMenu: NSObject {
     }
 
     func update(summary text: String, error: String?, sourceLabels: [String] = [],
-                authorization: PetNotificationAuthorization = .notDetermined) {
+                authorization: PetNotificationAuthorization = .notDetermined, protocolWarning: String? = nil) {
         sourceSummary = "来源：" + (sourceLabels.isEmpty ? "无" : sourceLabels.joined(separator: "、"))
         sourceItem.title = sourceSummary
         notificationStatusItem.title = "通知权限：\(authorization.title)"
@@ -75,6 +78,8 @@ final class StatusMenu: NSObject {
         summary.title = text
         errorItem.title = error.map { "连接错误：\($0)" } ?? ""
         errorItem.isHidden = error == nil
+        protocolItem.title = protocolWarning ?? ""
+        protocolItem.isHidden = protocolWarning == nil
         visibleItem.state = preferences.visible ? .on : .off
         throughItem.state = preferences.clickThrough ? .on : .off
         animationItem.state = preferences.animations ? .on : .off

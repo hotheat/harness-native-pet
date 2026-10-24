@@ -49,4 +49,27 @@ struct PetEventDispatcherTests {
         #expect(state.pose == .thinking)
         #expect(state.sessions.map(\.sessionId) == ["new"])
     }
+    @Test func protocolWarningDoesNotReplaceHealthyPresentation() async {
+        let store = PetStore()
+        let status = PetStatusModel()
+        let events = PetEventDispatcher(store: store, onUpdate: { _ in status.update(store.presentation()) },
+                                        onError: { status.connectionError = $0 },
+                                        onReady: { status.connectionError = nil },
+                                        onIncompatible: { status.protocolWarning = $0 })
+        let snapshot = SourceSnapshot(sourceId: "healthy", sourceLabel: "DSH", seq: 1, sessions: [
+            SessionSnapshot(sessionId: "s", turn: 1, phase: .working, activeTools: 1, pendingApprovals: 0, result: nil),
+        ])
+        await withCheckedContinuation { continuation in
+            events.enqueue(.message(.snapshot(snapshot)))
+            events.enqueue(.incompatible("协议不兼容"))
+            events.enqueue(.ready)
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        let state = store.presentation()
+        #expect(status.protocolWarning == "协议不兼容")
+        #expect(status.connectionError == nil)
+        #expect(state.connectedSources == 1)
+        #expect(AppDelegate.presentationText(state, pose: state.pose) == "1 个会话正在执行")
+    }
+
 }
