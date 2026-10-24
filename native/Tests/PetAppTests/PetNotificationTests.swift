@@ -10,9 +10,9 @@ struct PetNotificationTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func event(_ kind: PetActivityKind, id: String, provider: PetProvider = .codex,
-                       session: String = "same", turn: String = "turn") -> PetActivityEvent {
+                       session: String = "same", turn: String = "turn", time: Double? = nil) -> PetActivityEvent {
         PetActivityEvent(provider: provider, sessionId: session, turnId: turn,
-                         eventId: id, kind: kind, occurredAt: now.timeIntervalSince1970, toolId: nil)
+                         eventId: id, kind: kind, occurredAt: time ?? now.timeIntervalSince1970, toolId: nil)
     }
 
     @Test func recordingConsumesEachNoticeOnceWhileAnotherHostRuns() throws {
@@ -76,6 +76,7 @@ struct PetNotificationTests {
         ]), at: now)
         model.update(store.presentation(at: now))
         #expect(model.sessionRows.first { $0.title == "Codex · same" }?.id == codexID)
+        #expect(codexID == PetStatusModel.rowID(sourceId: "hook:codex", sessionId: "same"))
         #expect(model.summary.contains("Codex"))
         let name = "PetNotificationTests.\(UUID())"
         let defaults = UserDefaults(suiteName: name)!
@@ -253,6 +254,75 @@ struct PetNotificationTests {
         #expect(AppDelegate.isAutomation(arguments: ["pet", "--capture-live"], environment: [:]))
     }
 
+    @Test func shortResultsAreDrainedWhileWaitingAndErrorsBypassThreshold() throws {
+        let adapter = try RecordingPetNotificationAdapter()
+        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+        let store = PetStore()
+        for (session, kind, seconds) in [("short", PetActivityKind.turnEnded, 9.0), ("stop", .interrupted, 1),
+                                         ("long", .turnEnded, 10), ("long-stop", .interrupted, 11), ("error", .failed, 1)] {
+            store.apply(event(.turnStarted, id: "start-" + session, session: session), at: now)
+            store.apply(event(kind, id: "end-" + session, session: session, time: now.timeIntervalSince1970 + seconds), at: now)
+        }
+        store.apply(event(.waiting, id: "waiting", session: "waiting"), at: now)
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now.addingTimeInterval(0.4))
+        #expect(adapter.notices.map(\.sessionId) == ["long", "long-stop", "error", "waiting"])
+        #expect(adapter.notices.map(\.turnDuration) == [10, 11, 1, nil])
+        for notice in adapter.notices {
+            #expect((SystemPetNotificationAdapter.content(for: notice).sound != nil) == [.waiting, .error].contains(notice.kind))
+        }
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 0, at: now.addingTimeInterval(1))
+        #expect(dispatcher.requestCount == 4)
+    }
+
+    @Test func unknownDurationIsSubmittedAndResultContentIsSilent() throws {
+        let adapter = try RecordingPetNotificationAdapter()
+        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+        let store = PetStore()
+        store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 1, sessions: []), at: now)
+        store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 2, sessions: [
+            SessionSnapshot(sessionId: "unknown", turn: 1, phase: .completed, activeTools: 0, pendingApprovals: 0,
+                            result: SessionResult(id: "r", outcome: "completed")),
+        ]), at: now)
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now)
+        let ended = try #require(adapter.notices.first)
+        #expect(ended.turnDuration == nil)
+        let content = SystemPetNotificationAdapter.content(for: ended)
+        #expect(content.sound == nil)
+        #expect(content.userInfo["sourceId"] as? String == "dsh")
+        #expect(content.userInfo["sessionId"] as? String == "unknown")
+        store.apply(event(.failed, id: "error"), at: now)
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now)
+        #expect(SystemPetNotificationAdapter.content(for: try #require(adapter.notices.last)).sound != nil)
+    }
+
+    @Test func successfulSubmissionClearsOldErrorAndOpenForwardsIdentity() {
+        let adapter = AuthorizationTrackingAdapter()
+        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+        let status = PetStatusModel()
+        status.notificationError = "旧错误"
+        dispatcher.onError = { status.notificationError = $0 }
+        dispatcher.onOpen = { status.focusedSessionID = PetStatusModel.rowID(sourceId: $0, sessionId: $1) }
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "end"), at: now)
+        dispatcher.refresh(store: store, enabled: true, at: now)
+        #expect(status.notificationError == nil)
+        adapter.onOpen?("hook:codex", "same")
+        #expect(status.focusedSessionID == PetStatusModel.rowID(sourceId: "hook:codex", sessionId: "same"))
+        #expect(PetStatusModel.rowID(sourceId: "a", sessionId: "bc") != PetStatusModel.rowID(sourceId: "ab", sessionId: "c"))
+        #expect(PetStatusModel.rowID(sourceId: "中", sessionId: "s") == "3:中s")
+    }
+
+    @Test func noticeMinimumPreferenceAcceptsNumberAndLaunchArgumentString() {
+        let name = "PetNotificationTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 10)
+        defaults.set(2.5, forKey: "pet.noticeMinimumSeconds")
+        #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 2.5)
+        defaults.set("0", forKey: "pet.noticeMinimumSeconds")
+        #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 0)
+    }
+
     @Test func staleSessionShowsUncertainty() {
         let store = PetStore()
         store.apply(event(.turnStarted, id: "start"), at: now)
@@ -264,6 +334,7 @@ struct PetNotificationTests {
 
 @MainActor
 private final class DeniedNotificationAdapter: PetNotificationAdapter {
+    var onOpen: ((String, String) -> Void)?
     func authorization(request: Bool) async -> PetNotificationAuthorization { .denied }
     func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void) {
         completion("通知未授权")
@@ -272,6 +343,7 @@ private final class DeniedNotificationAdapter: PetNotificationAdapter {
 
 @MainActor
 private final class AuthorizationTrackingAdapter: PetNotificationAdapter {
+    var onOpen: ((String, String) -> Void)?
     var status: PetNotificationAuthorization = .notDetermined
     private(set) var requests: [Bool] = []
     func authorization(request: Bool) async -> PetNotificationAuthorization {

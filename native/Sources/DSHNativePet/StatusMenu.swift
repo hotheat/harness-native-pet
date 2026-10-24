@@ -8,6 +8,7 @@ final class StatusMenu: NSObject {
     private let sourceItem = NSMenuItem(title: "来源：无", action: nil, keyEquivalent: "")
     private let notificationStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let notificationItem = NSMenuItem(title: "系统通知", action: #selector(toggleNotifications), keyEquivalent: "")
+    private let notificationSettingsItem = NSMenuItem(title: "打开系统通知设置…", action: #selector(notificationSettings), keyEquivalent: "")
     private(set) var sourceSummary = "来源：无"
     private let protocolItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let errorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -35,6 +36,8 @@ final class StatusMenu: NSObject {
         menu.addItem(.separator())
         for item in [visibleItem, throughItem, animationItem, notificationItem] { item.target = self; menu.addItem(item) }
         menu.addItem(notificationStatusItem)
+        notificationSettingsItem.target = self
+        menu.addItem(notificationSettingsItem)
         let skinMenu = NSMenu(title: "角色")
         for skin in PetSkin.allCases {
             let item = NSMenuItem(title: skin.title, action: #selector(changeSkin(_:)), keyEquivalent: "")
@@ -74,6 +77,7 @@ final class StatusMenu: NSObject {
         sourceSummary = "来源：" + (sourceLabels.isEmpty ? "无" : sourceLabels.joined(separator: "、"))
         sourceItem.title = sourceSummary
         notificationStatusItem.title = "通知权限：\(authorization.title)"
+        notificationSettingsItem.isHidden = authorization != .denied
         notificationItem.state = preferences.systemNotifications ? .on : .off
         summary.title = text
         errorItem.title = error.map { "连接错误：\($0)" } ?? ""
@@ -91,6 +95,7 @@ final class StatusMenu: NSObject {
         onInteraction?()
         preferences.systemNotifications = enabled
     }
+    @objc private func notificationSettings() { PetNotificationAuthorization.openSettings() }
     @objc private func toggleNotifications() { setSystemNotifications(!preferences.systemNotifications) }
     @objc private func toggleVisible() { onInteraction?(); preferences.visible.toggle() }
     @objc private func toggleThrough() { onInteraction?(); preferences.clickThrough.toggle() }

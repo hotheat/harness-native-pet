@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var subscriptions: Set<AnyCancellable> = []
     private var timer: Timer?
+    private var deadlineTimer: Timer?
     private var terminationSignals: [DispatchSourceSignal] = []
     private var lastInteraction = Date()
     private var lastActivity = Date()
@@ -120,6 +121,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let index = arguments.firstIndex(of: "--notification-log") {
                 notificationLogPath = arguments[index + 1]
             }
+            if !automated, Bundle.main.bundleURL.pathExtension == "app" {
+                do {
+                    _ = try HelperSync.sync(bundled: Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/pet-hook"),
+                                            installed: FileManager.default.homeDirectoryForCurrentUser
+                                                .appendingPathComponent("Library/Application Support/dsh-native-pet/bin/pet-hook"))
+                } catch { fputs("DSHNativePet helper sync: \(error.localizedDescription)\n", stderr) }
+            }
             let notificationAdapter: any PetNotificationAdapter
             if automated {
                 notificationAdapter = try RecordingPetNotificationAdapter(logURL: notificationLogPath.map { URL(fileURLWithPath: $0) })
@@ -128,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             let notifications = PetNotificationDispatcher(adapter: notificationAdapter)
             notifications.onError = { [weak self] error in self?.status.notificationError = error }
+            notifications.onOpen = { [weak self] source, session in self?.showSession(sourceId: source, sessionId: session) }
             self.notifications = notifications
             canRequestNotificationAuthorization = !automated
             Task { @MainActor [weak self] in
@@ -182,8 +191,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectInteractions(_ view: PetView) {
         view.onInteraction = { [weak self] in self?.lastInteraction = Date() }
         view.onPoke = { [weak self] in
-            self?.pokeUntil = Date().addingTimeInterval(1.2)
-            self?.refresh()
+            guard let self else { return }
+            let presentation = self.store.presentation()
+            if presentation.pose == .waiting, let session = presentation.sessions.first(where: { $0.phase == .waiting }) {
+                self.showSession(sourceId: session.sourceId, sessionId: session.sessionId)
+            } else { self.pokeUntil = Date().addingTimeInterval(1.2) }
+            self.refresh()
         }
         view.onDrag = { [weak self] value in self?.dragging = value; self?.refresh() }
         view.onDragEnd = { [weak self] in self?.savePosition() }
@@ -247,9 +260,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refresh() {
         guard !stopped else { return }
         let now = Date()
-        notifications?.refresh(store: store, enabled: preferences.systemNotifications, at: now)
-        guard let view = petView, let panel else { return }
+        notifications?.refresh(store: store, enabled: preferences.systemNotifications,
+                               minimumDuration: preferences.noticeMinimumSeconds, at: now)
         let presentation = store.presentation(at: now)
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
+        if let deadline = store.nextDeadline(after: now) {
+            let timer = Timer(fire: deadline.addingTimeInterval(0.01), interval: 0, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.refresh() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            deadlineTimer = timer
+        }
+        guard let view = petView, let panel else { return }
         status.update(presentation)
         statusMenu?.update(summary: status.summary, error: status.connectionError,
                            sourceLabels: status.sourceLabels, authorization: status.notificationAuthorization,
@@ -266,6 +289,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if demoPose != nil { text = "预览 · \(pose.rawValue)" }
         if status.connectionError != nil { text = "连接异常，查看菜单栏" }
         let animated = preferences.animations && panel.isVisible && systemSuspensions.isEmpty
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if let assets = assetsBySkin[preferences.skin], view.skin != preferences.skin {
             animator?.stop()
             view.useAssets(assets)
@@ -286,6 +310,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return "\(feedback.text)，\(remaining)"
         }
         return presentation.text
+    }
+
+    private func showSession(sourceId: String, sessionId: String) {
+        status.focusedSessionID = nil
+        showSettings()
+        DispatchQueue.main.async { [weak self] in
+            self?.status.focusedSessionID = PetStatusModel.rowID(sourceId: sourceId, sessionId: sessionId)
+        }
     }
 
     private func showSettings() {
@@ -309,6 +341,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func observeSystemLifecycle() {
         let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(self, selector: #selector(displayOptionsChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
             center.addObserver(self, selector: #selector(suspend), name: name, object: nil)
         }
@@ -347,7 +380,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: "lock"
         }
     }
-    @objc private func screensChanged(_ notification: Notification) { panel?.constrainToScreens(); savePosition() }
+    @objc private func screensChanged(_ notification: Notification) { panel?.constrainToScreens() }
+    @objc private func displayOptionsChanged(_ notification: Notification) { refresh() }
 
     func fail(_ error: Error) {
         fputs("DSHNativePet: \(error.localizedDescription)\n", stderr)
@@ -366,6 +400,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stopped = true
         timer?.invalidate()
         timer = nil
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
         animator?.stop()
         petView?.stopVideo()
         savePosition()
