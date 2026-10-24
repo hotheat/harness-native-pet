@@ -65,7 +65,7 @@ Socket 绑定、GUI 会话或 AVFoundation 解码失败应分别记录为未验�
 ```
 
 该入口通过菜单选择方法依次切换小女孩、DSH Pet、小女孩，输出 PNG 及同名 JSON。
-换肤断言由 `bridge/tests/native-app.e2e.ts` 执行，包括三帧脚底坐标、sizePreference 和首尾 frame 一致。
+换肤断言由 `bridge/e2e/native-app.e2e.mjs` 执行，包括三帧脚底坐标、sizePreference 和首尾 frame 一致。
 证据 JSON 字段以该测试与 `scripts/test-hook-app.py` 的消费为准。
 去掉 `--demo-pose` 即保留真实 IPC；`test:native` 还会执行真实 DSH Host 的工作会话内切换场景。
 

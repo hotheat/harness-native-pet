@@ -1,0 +1,4 @@
+[submodule "bridge"]
+	path = bridge
+	url = https://github.com/hotheat/dsh-native-pet-plugin.git
+	branch = main

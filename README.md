@@ -10,11 +10,11 @@ Native macOS desktop pet for DeepSeek Harness, built with Swift and AppKit.
 ## 本地运行
 
 本机验收平台为 Apple Silicon / macOS 15，构建需要 Xcode 命令行工具、Swift 6 和 Node.js 22 或更高版本。
-插件的宿主依赖以 [package.json](bridge/package.json) 为准。
+DSH 插件源码位于 [hotheat/dsh-native-pet-plugin](https://github.com/hotheat/dsh-native-pet-plugin)，本仓库以 submodule 跟踪同一份实现，宿主依赖以其 [package.json](bridge/package.json) 为准。
 
 ```sh
+git submodule update --init
 npm --prefix bridge ci
-npm --prefix bridge run build
 bash scripts/package-app.sh
 open "dist/DSH Native Pet.app"
 ```
@@ -33,9 +33,10 @@ DSH Pet 使用 AVFoundation 播放原始透明 MOV；关闭动画后显示静态
 
 ## 接入 DSH
 
-先生成本地插件包：
+插件位于 submodule `bridge/`，先初始化再打包：
 
 ```sh
+git submodule update --init
 (cd bridge && npm pack)
 ```
 
@@ -44,6 +45,8 @@ DSH Pet 使用 AVFoundation 播放原始透明 MOV；关闭动画后显示静态
 ```sh
 dsh plugin --profile web add "$PWD/bridge/dsh-native-pet-0.1.0.tgz"
 ```
+
+也可以直接以本地 link 方式安装同一份源码，细节见插件仓库的 README。
 
 应用与 DSH 必须运行在同一个 macOS 用户下。
 默认通过 `~/Library/Application Support/dsh-native-pet/pet.sock` 通信。
