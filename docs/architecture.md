@@ -1,6 +1,7 @@
 # 架构
 
-DSH 公开 `session` / `agent` 事件进入 [bridge](../bridge/src/index.ts)，由会话 reducer 维护工具和审批集合。
+DSH 公开 `session` / `agent` 事件进入 [bridge](../bridge/lib/index.js)，由会话 reducer 维护工具和审批集合。
+插件源码位于 [hotheat/dsh-native-pet-plugin](https://github.com/hotheat/dsh-native-pet-plugin)，本仓库以 submodule 跟踪同一份实现。
 客户端把最新来源快照编码为 NDJSON，经本地 Unix socket 交给 Swift IPC 解码器。
 IPC 串行队列通过主队列 FIFO 提交给 `PetStore`，再由 AppDelegate 更新原生窗口、菜单和动画。
 
@@ -99,5 +100,5 @@ AppDelegate 每次刷新通过 PetNotificationDispatcher 消费提醒，生产�
 AppDelegate 集中判断自动化模式，在资源加载、通知 adapter、窗口和 IPC 之前校验缺值及参数组合。
 自动化使用录制通知 adapter，并关闭偏好写入。
 [Capture extension](../native/Sources/DSHNativePet/AppDelegate+Capture.swift) 负责截图与最小证据输出，仍编译进 release。
-[原生 E2E](../bridge/tests/native-app.e2e.ts) 负责三帧换肤的脚底坐标、尺寸偏好和首尾窗口 frame 断言。
+[原生 E2E](../bridge/e2e/native-app.e2e.mjs) 负责三帧换肤的脚底坐标、尺寸偏好和首尾窗口 frame 断言。
 视频截图保留实际解码帧、播放时间及透明/不透明像素证据。

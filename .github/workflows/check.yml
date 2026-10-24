@@ -5,16 +5,16 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: bridge/package-lock.json
       - run: npm --prefix bridge ci
-      - run: npm --prefix bridge run typecheck
       - run: npm --prefix bridge test
       - run: npm --prefix bridge run test:e2e
-      - run: npm --prefix bridge run build
       - run: swift test --package-path native
       - run: swift build --package-path native --product PetIPCSmoke
       - run: node scripts/check-boundaries.mjs
