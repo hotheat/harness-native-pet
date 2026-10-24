@@ -103,6 +103,7 @@ public struct PetNotice: Sendable {
     public let kind: PetNoticeKind
     public let title: String
     public let body: String
+    public let turnDuration: TimeInterval?
 }
 
 public struct PresentedSession: Equatable, Sendable {
