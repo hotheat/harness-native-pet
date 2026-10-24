@@ -172,12 +172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             onError: { [weak self] error in self?.status.connectionError = error },
-            onReady: { [weak self] in self?.status.connectionError = nil })
+            onReady: { [weak self] in self?.status.connectionError = nil },
+            onIncompatible: { [weak self] in self?.status.protocolWarning = $0 })
         do {
             try server.start(onMessage: { events.enqueue(.message($0)) },
                              onDisconnect: { events.enqueue(.disconnect($0)) },
                              onError: { events.enqueue(.listenerError($0)) },
-                             onReady: { events.enqueue(.ready) })
+                             onReady: { events.enqueue(.ready) },
+                             onIncompatible: { events.enqueue(.incompatible($0)) })
         } catch PetIPCError.alreadyRunning {
             print("DSHNativePet: already running; second instance exits")
             shutdown()
@@ -214,7 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let presentation = store.presentation(at: now)
         status.update(presentation)
         statusMenu?.update(summary: status.summary, error: status.connectionError,
-                           sourceLabels: status.sourceLabels, authorization: status.notificationAuthorization)
+                           sourceLabels: status.sourceLabels, authorization: status.notificationAuthorization,
+                           protocolWarning: status.protocolWarning)
         if presentation.activeCount > 0 || presentation.waitingCount > 0 || [.completed, .error].contains(presentation.pose) {
             lastActivity = now
         }

@@ -18,7 +18,7 @@ async function until(predicate: () => boolean, description = 'condition'): Promi
 }
 
 async function receiver(path: string) {
-  const messages: BridgeMessage[] = []
+  const messages: Exclude<BridgeMessage, { type: 'activity' }>[] = []
   const sockets = new Set<Socket>()
   const server = createServer(socket => {
     sockets.add(socket)
@@ -30,7 +30,7 @@ async function receiver(path: string) {
       for (;;) {
         const end = buffered.indexOf('\n')
         if (end < 0) break
-        messages.push(JSON.parse(buffered.slice(0, end)) as BridgeMessage)
+        messages.push(JSON.parse(buffered.slice(0, end)) as Exclude<BridgeMessage, { type: 'activity' }>)
         buffered = buffered.slice(end + 1)
       }
     })
@@ -58,6 +58,7 @@ test('initial connection failure, full reconnect snapshot, heartbeat, independen
     await until(() => host!.messages.some(m => m.type === 'snapshot'), 'first snapshot')
     const baseline = host.messages[0]!
     assert.equal(baseline.type, 'snapshot')
+    assert.deepEqual(Object.keys(baseline).sort(), ['seq', 'sessions', 'sourceId', 'sourceLabel', 'type'])
     await until(() => host!.messages.some(m => m.type === 'heartbeat'), 'heartbeat')
     sessions = [{ sessionId: 'a', turn: 1, phase: 'working', activeTools: 1, pendingApprovals: 0, result: null }]
     a.changed()

@@ -50,6 +50,15 @@ private final class POSIXClient {
         }
     }
 
+    func finishWrites() { Darwin.shutdown(fd, SHUT_WR) }
+
+    func expectClosed() throws {
+        var descriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        guard poll(&descriptor, 1, 3000) > 0 else { throw TestFailure.timeout }
+        var byte: UInt8 = 0
+        #expect(Darwin.recv(fd, &byte, 1, 0) == 0)
+    }
+
     func close() {
         if fd >= 0 { Darwin.close(fd); fd = -1 }
     }
@@ -311,4 +320,28 @@ struct UnixSocketServerTests {
         #expect(try String(contentsOf: socket, encoding: .utf8) == "keep")
         server.stop()
     }
+    @Test(arguments: [true, false]) func incompatibleVersionClosesOnlyItsClient(newline: Bool) throws {
+        let directory = location()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let server = UnixSocketServer(runtimeDirectory: directory)
+        defer { server.stop() }
+        let recorder = Recorder()
+        try server.start(onMessage: { recorder.append("message:\($0.sourceID):\($0.sequence)") },
+                         onDisconnect: { recorder.append("disconnect:\($0)") },
+                         onError: { recorder.append("error:\($0)") },
+                         onIncompatible: { _ in recorder.append("incompatible") })
+        let healthy = try POSIXClient(path: server.socketPath)
+        try healthy.write(snapshot())
+        try wait { recorder.events.count == 1 }
+        let bad = try POSIXClient(path: server.socketPath)
+        try bad.write(#"{"type":"heartbeat","sourceId":"bad","seq":1,"v":2}"# + (newline ? "\n" : ""))
+        if !newline { bad.finishWrites() }
+        try bad.expectClosed()
+        try wait { recorder.events.count == 2 }
+        #expect(recorder.events == ["message:a:1", "incompatible"])
+        try healthy.write(snapshot(seq: 2))
+        try wait { recorder.events.count == 3 }
+        #expect(recorder.events.last == "message:a:2")
+    }
+
 }

@@ -7,6 +7,7 @@ struct PetEventDispatcher: Sendable {
         case message(BridgeMessage)
         case disconnect(String)
         case listenerError(String)
+        case incompatible(String)
         case ready
     }
     private let receive: @MainActor @Sendable (Event) -> Void
@@ -15,7 +16,8 @@ struct PetEventDispatcher: Sendable {
     init(store: PetStore,
          onUpdate: @escaping @MainActor @Sendable (Event) -> Void = { _ in },
          onError: @escaping @MainActor @Sendable (String) -> Void = { _ in },
-         onReady: @escaping @MainActor @Sendable () -> Void = {}) {
+         onReady: @escaping @MainActor @Sendable () -> Void = {},
+         onIncompatible: @escaping @MainActor @Sendable (String) -> Void = { _ in }) {
         receive = { event in
             switch event {
             case let .message(.snapshot(snapshot)): store.apply(snapshot)
@@ -24,6 +26,7 @@ struct PetEventDispatcher: Sendable {
             case let .disconnect(sourceID): store.disconnect(sourceID: sourceID)
             case let .listenerError(error): onError(error)
             case .ready: onReady()
+            case let .incompatible(warning): onIncompatible(warning)
             }
             onUpdate(event)
         }
