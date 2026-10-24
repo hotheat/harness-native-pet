@@ -93,9 +93,8 @@ struct PetSkinTests {
         #expect(abs(265 * scale - 100) < 0.001)
         #expect(image.visibleBounds.height * scale > 122)
         #expect(view.frame.height > PetPreferences.Size.medium.panelSize.height)
-        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
         let effectTop = 8 + (image.anchor.y * CGFloat(image.cgImage.height) - image.visibleBounds.minY) * scale
-        #expect(label.frame.minY - effectTop >= 10)
+        #expect(view.bubbleFrame.minY - effectTop >= 10)
     }
 
     @Test func menuPreferencesSwitchSamePoseWithoutResettingDSHState() throws {
