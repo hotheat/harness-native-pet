@@ -7,11 +7,11 @@ enum HelperSync {
         guard manager.fileExists(atPath: installed.path) else { return false }
         let data = try Data(contentsOf: bundled)
         guard try Data(contentsOf: installed) != data else { return false }
-        let temporary = installed.deletingLastPathComponent().appendingPathComponent(".pet-hook-\(UUID())")
-        defer { try? manager.removeItem(at: temporary) }
-        try data.write(to: temporary, options: .withoutOverwriting)
-        try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: temporary.path)
-        guard rename(temporary.path, installed.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno)!) }
+        return try install(bundled: bundled, installed: installed)
+    }
+
+    static func install(bundled: URL, installed: URL) throws -> Bool {
+        try HostFileWriter.write(Data(contentsOf: bundled), to: installed, mode: 0o700)
         return true
     }
 }
