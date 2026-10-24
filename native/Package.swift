@@ -16,7 +16,7 @@ let package = Package(
         .target(name: "PetIPC", dependencies: ["PetCore"]),
         .target(name: "PetHooks", dependencies: ["PetCore", "PetIPC"]),
         .executableTarget(name: "PetHookCLI", dependencies: ["PetHooks"]),
-        .executableTarget(name: "DSHNativePet", dependencies: ["PetCore", "PetIPC"], resources: [.copy("Resources/Character"), .copy("Resources/DSHPet")]),
+        .executableTarget(name: "DSHNativePet", dependencies: ["PetCore", "PetIPC"], resources: [.copy("Resources/Character"), .copy("Resources/DSHPet"), .copy("Resources/Icons")]),
         .executableTarget(name: "PetIPCSmoke", dependencies: ["PetCore", "PetIPC"]),
         .testTarget(name: "PetCoreTests", dependencies: ["PetCore"]),
         .testTarget(name: "PetHooksTests", dependencies: ["PetHooks", "PetCore"]),

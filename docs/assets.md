@@ -28,3 +28,19 @@ swift scripts/validate-dsh-pet.swift
 第一项校验小女孩的尺寸、透明度与像素包络。
 第二项校验九段 MOV 可播放、透明像素、真实运动，以及首帧 PNG 与视频尺寸一致。
 原始编码的透明区域可能保留颜色，目视应使用实际 alpha 合成结果。
+
+## 应用与菜单栏图标
+
+应用图标使用用户提供的 Pet Bed.svg，保留蓝粉配色，增加浅色圆角底板和统一留白。
+菜单栏使用用户提供的 pet.svg，将白色内部改为透明镂空，作为 18 pt 单色 PDF 模板由 AppKit 适配深浅背景。
+原始文件保存在 [图标来源](../designs/icons/source/)，优化后的 SVG 位于 [designs/icons](../designs/icons/)。
+来源文件未附许可证，仓库只记录用户提供的来源，不推定第三方许可。
+
+修改 SVG 后，安装 librsvg 并重新生成原生资源：
+
+```sh
+python3 scripts/generate-icons.py
+```
+
+脚本使用 rsvg-convert 和 macOS iconutil 生成多尺寸 ICNS 及矢量 PDF。
+常规构建使用仓库中的生成资源，无需安装 librsvg。

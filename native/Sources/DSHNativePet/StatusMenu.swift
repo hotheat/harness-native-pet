@@ -22,7 +22,7 @@ final class StatusMenu: NSObject {
         self.preferences = preferences
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
-        statusItem.button?.image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "DSH 桌宠")
+        statusItem.button?.image = PetIcons.menuBarImage()
         statusItem.button?.toolTip = "DSH Native Pet"
         let menu = NSMenu()
         menu.addItem(summary)

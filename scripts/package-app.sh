@@ -16,6 +16,11 @@ for PACK in Character DSHPet; do
   rm -rf "$APP/Contents/Resources/$PACK"
   cp -R "$ROOT/native/Sources/DSHNativePet/Resources/$PACK" "$APP/Contents/Resources/$PACK"
 done
+test -f "$ROOT/native/Sources/DSHNativePet/Resources/Icons/AppIcon.icns"
+test -f "$ROOT/native/Sources/DSHNativePet/Resources/Icons/MenuBarTemplate.pdf"
+rm -rf "$APP/Contents/Resources/Icons"
+cp -R "$ROOT/native/Sources/DSHNativePet/Resources/Icons" "$APP/Contents/Resources/Icons"
+cp "$ROOT/native/Sources/DSHNativePet/Resources/Icons/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 /usr/bin/plutil -lint "$APP/Contents/Info.plist"
 /usr/bin/codesign --force --sign - "$APP/Contents/MacOS/pet-hook"
 /usr/bin/codesign --force --sign - "$APP"

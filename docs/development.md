@@ -71,3 +71,11 @@ python3 scripts/test-real-host-hooks.py --app 'dist/DSH Native Pet.app' --output
 脚本为每个宿主创建临时 HOME 和配置，Codex hooks 经官方配置接口信任，退出时清理临时目录。
 桌面内置 runtime 的通过结果不代表桌面窗口内已完成实际会话验收。
 两套测试使用录制通知 adapter；系统授权和实际展示需正常启动应用验证。
+
+## DMG 安装包
+
+```sh
+bash scripts/package-dmg.sh
+```
+
+脚本编译应用，在 dist 生成当前 CPU 架构的 DMG，包含 Applications 拖放入口和宿主接入脚本。
