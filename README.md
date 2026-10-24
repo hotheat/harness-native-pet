@@ -29,7 +29,8 @@ DSH Pet 使用 AVFoundation 播放原始透明 MOV；关闭动画后显示静态
 
 ## 接入 Codex / Claude Code
 
-安装附带的原生 hook helper，配置与使用步骤见 [宿主接入](docs/host-hooks.md)。
+在设置窗口的「宿主连接」中勾选宿主要接入并保存，可逐项测试连线状态。
+细节与脚本化安装方式见 [宿主接入](docs/host-hooks.md)。
 
 ## 接入 DSH
 

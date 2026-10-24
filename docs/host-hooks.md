@@ -10,26 +10,30 @@
 菜单和设置中的「系统通知」可单独关闭提醒，桌宠继续显示状态。
 如果已拒绝授权，可在 macOS 系统设置的通知中允许 DSH Native Pet。
 
-在下载包内双击 `安装宿主接入.command`，或执行：
+在设置窗口的「宿主连接」中勾选要接入的宿主，点「保存」。
+应用会把 `pet-hook` 安装到 `~/Library/Application Support/dsh-native-pet/bin/pet-hook`，并把本项目 hooks 合并到 Codex 的 `hooks.json` 或 Claude Code 的 `settings.json`。
+取消勾选再保存即可移除本项目 handlers，其他 hooks 与配置保持原样。
+每次写入前，原文件会备份为 `<文件名>.dsh-native-pet-<UTC 时间戳>.bak`；写入使用临时文件原子替换，失败时保留原文件并在界面显示原因。
+
+每行都有「测试」，依次检查三层：本机 socket 是否可达、配置与 helper 是否一致、30 秒内是否收到该宿主的真实事件。
+第三层需要你在宿主里发起一次会话操作。
+
+「宿主连接」中的 DSH 一栏只做探测，不修改 profile。
+
+没有图形界面或需要脚本化时，仍可使用安装器：
 
 ```sh
 python3 "DSH Native Pet.app/Contents/Resources/install-hooks.py" \
   --app "DSH Native Pet.app" --target both
 ```
 
-安装器把 helper 复制到用户 Application Support 的固定位置，将本项目 hooks 合并到 Codex 的 `hooks.json` 和 Claude Code 的 `settings.json`。
-已有配置会备份，已有其他 hooks 保留；重复安装不会新增重复 handler。
-设置了 `CODEX_HOME` 或 `CLAUDE_CONFIG_DIR` 时，使用对应目录。
-卸载本项目 handlers：
+脚本与本应用共用同一套合并语义，由 `contracts/fixtures/host-hooks.json` 约束。
+卸载：`install-hooks.py --uninstall --target both`。
 
-```sh
-python3 "DSH Native Pet.app/Contents/Resources/install-hooks.py" --uninstall --target both
-```
-
-Codex 的非托管 hooks 需要在 `/hooks` 或桌面 Hooks 设置中审核并启用。
-安装器不会替用户写入 Codex 的信任记录。
+Codex 的非托管 hooks 需要在 `/hooks` 或桌面 Hooks 设置中审核并启用，应用不会替用户写入信任记录。
 Claude Code 安装后重新开始会话。
-CLI 与本机桌面运行环境使用同一 Codex 配置目录时可以共用配置；如果桌面环境使用不同的 `CODEX_HOME`，需安装到该目录。
+配置目录优先使用应用进程的环境变量 `CODEX_HOME` / `CLAUDE_CONFIG_DIR`，缺失时使用默认目录；图形界面不继承登录 shell 的环境，非默认目录请在启动应用的环境中设置。
+CLI 与本机桌面运行环境使用同一 Codex 配置目录时可以共用配置。
 远程执行环境不能直接访问本机 socket，不能以本机 runtime 验收代替云端支持。
 
 ## 提醒语义
