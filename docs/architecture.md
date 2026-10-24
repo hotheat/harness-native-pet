@@ -86,10 +86,13 @@ PetStore 保留来源标签并分别计算当前呈现与一次性 PetNotice，�
 提醒队列保留整批合法提醒；event、tool、retiredTurn、session 和输入字节上限仍由现有实现限制。
 `PetPresentation.feedback` 提供 pose、无来源前缀的 text 和可选 sourceLabel；AppDelegate 按字段排版，`presentation.text` 保留 Core 文案。
 AppDelegate 每次刷新通过 PetNotificationDispatcher 消费提醒，生产使用 UserNotifications adapter，联合测试使用录制 adapter。
+`PetStore.nextDeadline(after:)` 驱动 hook 等待去抖和反馈到期的精确单次刷新，不依赖 1 秒定时器。
+系统通知只在等待和出错时发声；通知携带 sourceId / sessionId，点击后经 AppDelegate 打开设置并定位会话行。
 系统通知权限或开关不影响桌宠显示；自动化入口不写用户偏好。
 
 宿主事件与真实 IPC、真实宿主加确定性模型的验证入口见 [开发指南](development.md)。
 [安装器](../scripts/install-hooks.py) 将 helper 复制到目标目录中的临时文件，设置 0700 权限后原子替换，失败保留旧文件。
+正常启动应用时，`HelperSync` 将过期的已安装 `pet-hook` 原子替换为应用附带的 helper。
 
 ## 自动化与 capture
 
