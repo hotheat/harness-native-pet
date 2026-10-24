@@ -59,8 +59,14 @@ dsh plugin --profile web add "$PWD/bridge/dsh-native-pet-0.1.0.tgz"
 
 ## 构建产物
 
-打包脚本生成 `dist/DSH Native Pet.app`，使用本机 ad-hoc 签名。
-这是本地构建，尚未进行 Developer ID 签名或 Apple 公证。
+每次推送到 `main` 都会更新滚动发布 `latest`，推送 `v*` 标签会发布对应版本。
+最新 macOS arm64 构建可通过固定链接下载：
+
+- [DMG 安装包](https://github.com/hotheat/harness-native-pet/releases/latest/download/dsh-native-pet-macos-arm64.dmg)
+- [应用 ZIP](https://github.com/hotheat/harness-native-pet/releases/latest/download/DSH-Native-Pet-macos-arm64.zip)
+
+构建使用 ad-hoc 签名，未进行 Developer ID 签名或 Apple 公证。
+本地打包脚本生成 `dist/DSH Native Pet.app`。
 移动到其他目录后的资源检查：
 
 ```sh
