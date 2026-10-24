@@ -1,12 +1,37 @@
 import AppKit
 import PetCore
+import SwiftUI
+
+private struct PetBubbleView: View {
+    let text: String
+    var width: CGFloat?
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(Color(nsColor: .labelColor))
+            .padding(.vertical, 2)
+            .padding(.horizontal, 7)
+            .background(Color(nsColor: .windowBackgroundColor).opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+            .frame(width: width)
+    }
+}
+
+private final class PetBubbleHostingView: NSHostingView<PetBubbleView> {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
 
 @MainActor
 final class PetView: NSView {
     let characterLayer = CALayer()
     private var assets: PetAssets
     let videoPlayback = PetVideoPlayback()
-    private let message = NSTextField(labelWithString: "")
+    private let message = PetBubbleHostingView(rootView: PetBubbleView(text: ""))
+    private(set) var displayText = ""
+    var bubbleFrame: NSRect { message.frame }
     private var currentImage: PetAssets.Image?
     private(set) var currentPose: PetPose?
     var skin: PetSkin { assets.skin }
@@ -28,20 +53,7 @@ final class PetView: NSView {
         characterLayer.magnificationFilter = .linear
         characterLayer.minificationFilter = .trilinear
         layer?.addSublayer(characterLayer)
-        message.alignment = .center
-        message.font = .systemFont(ofSize: 11, weight: .medium)
-        message.textColor = .labelColor
-        message.backgroundColor = .windowBackgroundColor.withAlphaComponent(0.94)
-        message.drawsBackground = true
-        message.isBezeled = false
-        message.maximumNumberOfLines = 2
-        message.cell?.usesSingleLineMode = false
-        message.cell?.isScrollable = false
-        message.cell?.wraps = true
-        message.lineBreakMode = .byWordWrapping
-        message.wantsLayer = true
-        message.layer?.cornerRadius = 8
-        message.layer?.masksToBounds = true
+        message.isHidden = true
         addSubview(message)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
@@ -79,8 +91,9 @@ final class PetView: NSView {
         } else if videoPlayback.isActive {
             stopVideo()
         }
-        if message.stringValue != text {
-            message.stringValue = text
+        if displayText != text {
+            displayText = text
+            message.rootView = PetBubbleView(text: text, width: message.rootView.width)
             needsLayout = true
         }
         message.isHidden = text.isEmpty
@@ -105,9 +118,12 @@ final class PetView: NSView {
         }
         CATransaction.commit()
         let width = bounds.width - 14
-        let textHeight = message.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height ?? 0
-        let height = min(30, max(18, ceil(textHeight) + 4))
-        // 保持原 30 pt 气泡的中心线，避免行数变化时上下跳动。
+        // fittingSize 按 SwiftUI 的宽度提案换行，再由文字和内边距决定高度。
+        if message.rootView.width != width {
+            message.rootView.width = width
+        }
+        let height = min(32, message.fittingSize.height)
+        // 保持历史气泡中心线，避免行数变化时上下跳动。
         message.frame = NSRect(x: 7, y: bounds.height - 19 - height / 2, width: width, height: height)
     }
 

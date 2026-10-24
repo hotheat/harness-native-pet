@@ -140,10 +140,9 @@ struct PetNotificationTests {
             #expect(presentation.sessions.isEmpty)
             let text = AppDelegate.presentationText(presentation, pose: presentation.pose)
             try view.render(pose: presentation.pose, text: text, animated: false)
-            let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
-            #expect(label.stringValue == presentation.text)
-            #expect(label.stringValue.contains("Codex"))
-            #expect(label.stringValue.contains(expected))
+            #expect(view.displayText == presentation.text)
+            #expect(view.displayText.contains("Codex"))
+            #expect(view.displayText.contains(expected))
         }
     }
 
@@ -167,11 +166,16 @@ struct PetNotificationTests {
         view.frame = NSRect(x: 0, y: 0, width: 140, height: 154)
         try view.render(pose: .thinking, text: "正在思考")
         view.layoutSubtreeIfNeeded()
-        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
-        #expect(label.frame.height < 30)
-        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
-        let measured = try #require(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: label.frame.width, height: .greatestFiniteMagnitude)))
-        #expect(label.frame.height >= measured.height)
+        let singleLineFrame = view.bubbleFrame
+        #expect(singleLineFrame.height > 0)
+        #expect(singleLineFrame.midY == view.bounds.height - 19)
+        #expect(singleLineFrame.minX == 7)
+        #expect(singleLineFrame.width == view.bounds.width - 14)
+        try view.render(pose: .thinking, text: "Claude Code\n本轮结束 · 1 执行中")
+        view.layoutSubtreeIfNeeded()
+        #expect(view.bubbleFrame.height - singleLineFrame.height >= 10)
+        #expect(view.bubbleFrame.height <= 32)
+        #expect(view.bubbleFrame.midY == singleLineFrame.midY)
     }
 
     @Test func textOnlyRenderResizesBubbleAtHistoricalCenter() throws {
@@ -180,18 +184,41 @@ struct PetNotificationTests {
         view.frame = NSRect(x: 0, y: 0, width: 140, height: 154)
         try view.render(pose: .thinking, text: "正在思考")
         view.layoutSubtreeIfNeeded()
-        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
-        let singleLineHeight = label.frame.height
+        let singleLineFrame = view.bubbleFrame
+        #expect(!view.needsLayout)
+        try view.render(pose: .thinking, text: "正在思考")
         #expect(!view.needsLayout)
         try view.render(pose: .thinking, text: "Claude Code\n本轮结束 · 1 执行中")
         #expect(view.needsLayout)
         view.layoutSubtreeIfNeeded()
-        #expect(label.frame.height > singleLineHeight)
-        #expect(label.frame.height <= 30)
-        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
+        #expect(view.bubbleFrame.height - singleLineFrame.height >= 10)
+        #expect(view.bubbleFrame.height <= 32)
+        #expect(view.bubbleFrame.midY == singleLineFrame.midY)
+        #expect(view.bubbleFrame.midY == view.bounds.height - 19)
         try view.render(pose: .thinking, text: "正在思考")
         view.layoutSubtreeIfNeeded()
-        #expect(label.frame.height == singleLineHeight)
+        #expect(view.bubbleFrame == singleLineFrame)
+    }
+
+    @Test func bubblePassesMouseHitsToPetViewAndPreservesAccessibility() throws {
+        _ = NSApplication.shared
+        let view = PetView(assets: try PetAssets())
+        view.frame = NSRect(x: 0, y: 0, width: 140, height: 154)
+        try view.render(pose: .thinking, text: "正在思考")
+        view.layoutSubtreeIfNeeded()
+        let bubble = try #require(view.subviews.first)
+        #expect(!bubble.isHidden)
+        #expect(view.hitTest(NSPoint(x: view.bubbleFrame.midX, y: view.bubbleFrame.midY)) === view)
+        #expect(view.toolTip == view.displayText)
+        #expect(view.isAccessibilityElement())
+        #expect(view.accessibilityRole() == .button)
+        #expect(view.accessibilityLabel() == "DSH 桌宠，点击互动，拖动移动")
+        #expect(view.accessibilityValue() as? String == view.displayText)
+        try view.render(pose: .thinking, text: "")
+        #expect(view.displayText == "")
+        #expect(bubble.isHidden)
+        #expect(view.toolTip == "DSH 桌宠")
+        #expect(view.accessibilityValue() as? String == "")
     }
 
     @Test func parallelEndFeedbackFitsTwoLinesWithSourceAndRemainingWork() throws {
@@ -210,14 +237,10 @@ struct PetNotificationTests {
         view.frame = NSRect(origin: .zero, size: try assets.requiredPanelSize(characterHeight: 100))
         try view.render(pose: presentation.pose, text: AppDelegate.presentationText(presentation, pose: presentation.pose))
         view.layoutSubtreeIfNeeded()
-        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
-        #expect(label.stringValue == "Claude Code\n本轮结束 · 1 执行中")
-        label.maximumNumberOfLines = 0
-        let measured = try #require(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: label.frame.width, height: 1000)))
-        label.maximumNumberOfLines = 2
-        #expect(measured.height <= label.frame.height)
-        #expect(label.frame.height <= 30)
-        #expect(abs(label.frame.midY - (view.bounds.height - 19)) <= 0.5)
+        #expect(view.displayText == "Claude Code\n本轮结束 · 1 执行中")
+        #expect(view.bubbleFrame.height > 20)
+        #expect(view.bubbleFrame.height <= 32)
+        #expect(view.bubbleFrame.midY == view.bounds.height - 19)
         let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: bitmap)
         let png = try #require(bitmap.representation(using: .png, properties: [:]))
