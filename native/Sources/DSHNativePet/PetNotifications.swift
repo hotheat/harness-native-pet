@@ -1,9 +1,14 @@
+import AppKit
 import Foundation
 import PetCore
 import UserNotifications
 
 enum PetNotificationAuthorization: String, Sendable {
     case notDetermined, authorized, denied, provisional, unavailable, recording
+
+    @MainActor static func openSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+    }
 
     var title: String {
         switch self {
@@ -19,6 +24,7 @@ enum PetNotificationAuthorization: String, Sendable {
 
 @MainActor
 protocol PetNotificationAdapter: AnyObject {
+    var onOpen: ((String, String) -> Void)? { get set }
     func authorization(request: Bool) async -> PetNotificationAuthorization
     func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void)
 }
@@ -26,6 +32,7 @@ protocol PetNotificationAdapter: AnyObject {
 /// 仅正常应用启动使用；测试和截图路径使用录制 adapter。
 @MainActor
 final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUserNotificationCenterDelegate {
+    var onOpen: ((String, String) -> Void)?
     private let center: UNUserNotificationCenter
 
     override init() {
@@ -64,16 +71,32 @@ final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUs
     }
 
     private nonisolated static func systemSubmit(_ notice: PetNotice) async -> String? {
-        let content = UNMutableNotificationContent()
-        content.title = notice.title
-        content.body = notice.body
-        content.sound = .default
-        content.threadIdentifier = "\(notice.sourceId):\(notice.sessionId)"
+        let content = Self.content(for: notice)
         let request = UNNotificationRequest(identifier: notice.id, content: content, trigger: nil)
         do {
             try await UNUserNotificationCenter.current().add(request)
             return nil
         } catch { return error.localizedDescription }
+    }
+
+    nonisolated static func content(for notice: PetNotice) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        content.body = notice.body
+        if notice.kind == .waiting || notice.kind == .error { content.sound = .default }
+        content.threadIdentifier = "\(notice.sourceId):\(notice.sessionId)"
+        content.userInfo = ["sourceId": notice.sourceId, "sessionId": notice.sessionId]
+        return content
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+        let info = response.notification.request.content.userInfo
+        if let source = info["sourceId"] as? String, let session = info["sessionId"] as? String {
+            Task { @MainActor [weak self] in self?.onOpen?(source, session) }
+        }
+        completionHandler()
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
@@ -85,6 +108,7 @@ final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUs
 
 @MainActor
 final class RecordingPetNotificationAdapter: PetNotificationAdapter {
+    var onOpen: ((String, String) -> Void)?
     private(set) var notices: [PetNotice] = []
     private let logURL: URL?
 
@@ -124,7 +148,11 @@ final class PetNotificationDispatcher {
     private let adapter: any PetNotificationAdapter
     private(set) var requestCount = 0
     private var didRequestAuthorization = false
-    var onError: (@MainActor (String) -> Void)?
+    var onError: (@MainActor (String?) -> Void)?
+    var onOpen: ((String, String) -> Void)? {
+        get { adapter.onOpen }
+        set { adapter.onOpen = newValue }
+    }
 
     init(adapter: any PetNotificationAdapter) { self.adapter = adapter }
 
@@ -135,13 +163,14 @@ final class PetNotificationDispatcher {
         return await adapter.authorization(request: true)
     }
 
-    func refresh(store: PetStore, enabled: Bool, at: Date = Date()) {
+    func refresh(store: PetStore, enabled: Bool, minimumDuration: TimeInterval = 0, at: Date = Date()) {
         let notices = store.drainNotices(at: at)
         guard enabled else { return }
         for notice in notices {
+            if [.ended, .interrupted].contains(notice.kind), let duration = notice.turnDuration, duration < minimumDuration { continue }
             requestCount += 1
             adapter.submit(notice) { [weak self] error in
-                if let error { self?.onError?(error) }
+                self?.onError?(error)
             }
         }
     }

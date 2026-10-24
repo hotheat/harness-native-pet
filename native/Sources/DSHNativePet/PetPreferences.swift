@@ -20,6 +20,7 @@ final class PetPreferences: ObservableObject {
     }
     private let defaults: UserDefaults
     private let persistChanges: Bool
+    let noticeMinimumSeconds: TimeInterval
     @Published var skin: PetSkin { didSet { if persistChanges { defaults.set(skin.rawValue, forKey: "pet.skin") } } }
     @Published var visible: Bool { didSet { if persistChanges { defaults.set(visible, forKey: "pet.visible") } } }
     @Published var clickThrough: Bool { didSet { if persistChanges { defaults.set(clickThrough, forKey: "pet.clickThrough") } } }
@@ -30,6 +31,8 @@ final class PetPreferences: ObservableObject {
     init(defaults: UserDefaults = .standard, persistChanges: Bool = true) {
         self.defaults = defaults
         self.persistChanges = persistChanges
+        let minimum = defaults.object(forKey: "pet.noticeMinimumSeconds")
+        noticeMinimumSeconds = (minimum as? NSNumber)?.doubleValue ?? (minimum as? String).flatMap(Double.init) ?? 10
         skin = PetSkin(rawValue: defaults.string(forKey: "pet.skin") ?? "") ?? .character
         visible = defaults.object(forKey: "pet.visible") == nil ? true : defaults.bool(forKey: "pet.visible")
         clickThrough = defaults.bool(forKey: "pet.clickThrough")

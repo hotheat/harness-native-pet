@@ -41,7 +41,7 @@ function object(value: unknown, keys: string[]): value is Record<string, unknown
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     && keys.every(key => Object.hasOwn(value, key))
 }
-function validSession(value: unknown): boolean {
+function validSession(value: unknown): value is SessionSnapshot {
   if (!object(value, ['sessionId', 'turn', 'phase', 'activeTools', 'pendingApprovals', 'result'])) return false
   return nonempty(value.sessionId) && (value.turn === null || natural(value.turn))
     && typeof value.phase === 'string' && phases.has(value.phase)
@@ -71,7 +71,8 @@ export function decodeMessage(value: unknown): BridgeMessage {
   if (!nonempty(fields.sourceId) || fields.sourceId.startsWith('hook:') || !natural(fields.seq) || fields.seq === 0) throw new Error('Invalid desktop pet source or sequence')
   if (!snapshot) return { type: 'heartbeat', sourceId: fields.sourceId, seq: fields.seq }
   if (!nonempty(fields.sourceLabel) || !Array.isArray(fields.sessions)
-    || !fields.sessions.every(validSession)) throw new Error('Invalid desktop pet session snapshot')
+    || !fields.sessions.every(validSession)
+    || new Set(fields.sessions.map(session => session.sessionId)).size !== fields.sessions.length) throw new Error('Invalid desktop pet session snapshot')
   const sessions = (fields.sessions as SessionSnapshot[]).map(session => ({
     sessionId: session.sessionId, turn: session.turn, phase: session.phase,
     activeTools: session.activeTools, pendingApprovals: session.pendingApprovals,

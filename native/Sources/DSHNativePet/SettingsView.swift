@@ -6,6 +6,7 @@ import PetCore
 final class PetStatusModel: ObservableObject {
     @Published var summary = "暂无宿主状态"
     @Published var sessionRows: [SessionRow] = []
+    @Published var focusedSessionID: String?
     @Published var connectionError: String?
     @Published var protocolWarning: String?
     @Published var notificationAuthorization: PetNotificationAuthorization = .notDetermined
@@ -24,10 +25,14 @@ final class PetStatusModel: ObservableObject {
         let hosts = sourceLabels.isEmpty ? "宿主" : sourceLabels.joined(separator: "、")
         summary = state.connectedSources == 0 ? "暂无宿主状态" : "\(hosts) · 来源 \(state.connectedSources) · 活动 \(state.activeCount) · 等待 \(state.waitingCount)"
         sessionRows = state.sessions.map { session in
-            SessionRow(id: "\(session.sourceId.utf8.count):\(session.sourceId)\(session.sessionId)",
+            SessionRow(id: Self.rowID(sourceId: session.sourceId, sessionId: session.sessionId),
                        title: "\(session.sourceLabel) · \(session.sessionId.prefix(30))",
                        detail: session.isStale ? "状态待确认" : "\(Self.phaseTitle(session.phase)) · 工具 \(session.activeTools) · 待决定 \(session.pendingApprovals)")
         }
+    }
+
+    static func rowID(sourceId: String, sessionId: String) -> String {
+        "\(sourceId.utf8.count):\(sourceId)\(sessionId)"
     }
 
     static func phaseTitle(_ phase: SessionPhase) -> String {
@@ -49,6 +54,17 @@ struct SettingsView: View {
     @ObservedObject var status: PetStatusModel
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+                .onAppear { if let id = status.focusedSessionID { proxy.scrollTo(id, anchor: .center) } }
+                .onChange(of: status.focusedSessionID) { _, id in
+                    if let id { proxy.scrollTo(id, anchor: .center) }
+                }
+        }
+        .frame(width: 430, height: 640)
+    }
+
+    private var form: some View {
         Form {
             Section("桌宠") {
                 Toggle("显示桌宠", isOn: $preferences.visible)
@@ -66,6 +82,9 @@ struct SettingsView: View {
             Section("通知") {
                 Toggle("系统通知", isOn: $preferences.systemNotifications)
                 Text(status.notificationAuthorization.title).font(.caption).foregroundStyle(.secondary)
+                if status.notificationAuthorization == .denied {
+                    Button("打开系统通知设置…") { PetNotificationAuthorization.openSettings() }
+                }
                 if let error = status.notificationError {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
@@ -91,11 +110,15 @@ struct SettingsView: View {
                             Text(session.title).font(.system(.caption, design: .monospaced))
                             Text(session.detail).foregroundStyle(.secondary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                        .background(status.focusedSessionID == session.id ? Color.accentColor.opacity(0.15) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 6))
+                        .id(session.id)
                     }
                 }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 430, height: 640)
     }
 }

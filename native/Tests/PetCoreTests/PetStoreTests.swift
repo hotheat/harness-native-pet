@@ -146,9 +146,12 @@ struct PetStoreTests {
         let store = PetStore()
         store.apply(snapshot([session(phase: .waiting)]), at: now)
         #expect(store.drainNotices(at: now.addingTimeInterval(1)).isEmpty)
+        #expect(store.nextDeadline(after: now) == nil)
         store.apply(snapshot([session(phase: .working)], seq: 2), at: now)
         store.apply(snapshot([session(phase: .waiting)], seq: 3), at: now)
-        #expect(store.drainNotices(at: now).map(\.kind) == [.waiting])
+        let notices = store.drainNotices(at: now)
+        #expect(notices.map(\.kind) == [.waiting])
+        #expect(notices.first?.turnDuration == nil)
         store.apply(snapshot([session(phase: .waiting)], seq: 4), at: now.addingTimeInterval(1))
         #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
         store.apply(snapshot([], seq: 5), at: now.addingTimeInterval(3))
@@ -166,6 +169,84 @@ struct PetStoreTests {
             store.apply(snapshot([session(phase: .completed, result: SessionResult(id: "r-\(index)", outcome: "completed"))], seq: index + 1), at: now)
         }
         #expect(store.drainNotices(at: now).map(\.id) == (1...300).map { "a:s:r-\($0)" })
+    }
+
+    @Test func continuedTurnStopsNotifyTwiceAfterToolActivity() {
+        let store = PetStore()
+        let kinds: [PetActivityKind] = [.turnStarted, .turnEnded, .toolStarted, .toolFinished, .turnEnded]
+        for (index, kind) in kinds.enumerated() {
+            store.apply(PetActivityEvent(provider: .codex, sessionId: "continued", turnId: "turn",
+                                         eventId: "event-\(index)", kind: kind,
+                                         occurredAt: 1000 + Double(index),
+                                         toolId: kind == .toolStarted || kind == .toolFinished ? "tool" : nil),
+                        at: now.addingTimeInterval(Double(index)))
+        }
+        let notices = store.drainNotices(at: now.addingTimeInterval(4))
+        #expect(notices.map(\.kind) == [.ended, .ended])
+        #expect(notices.map(\.sourceLabel) == ["Codex", "Codex"])
+        #expect(notices.map(\.turnDuration) == [1, 4])
+        #expect(store.presentation(at: now.addingTimeInterval(4)).pose == .completed)
+    }
+
+    @Test func nextDeadlineTracksWaitingAndFeedback() {
+        let store = PetStore()
+        #expect(store.nextDeadline(after: now) == nil)
+        func hook(_ kind: PetActivityKind, session: String) -> PetActivityEvent {
+            PetActivityEvent(provider: .codex, sessionId: session, turnId: "t", eventId: UUID().uuidString,
+                             kind: kind, occurredAt: 1000, toolId: nil)
+        }
+        store.apply(hook(.turnEnded, session: "done"), at: now)
+        #expect(store.nextDeadline(after: now) == now.addingTimeInterval(3))
+        store.apply(hook(.waiting, session: "wait"), at: now)
+        #expect(store.nextDeadline(after: now) == now.addingTimeInterval(0.3))
+        #expect(store.nextDeadline(after: now.addingTimeInterval(0.3)) == now.addingTimeInterval(3))
+        _ = store.drainNotices(at: now.addingTimeInterval(0.31))
+        #expect(store.nextDeadline(after: now.addingTimeInterval(0.31)) == now.addingTimeInterval(3))
+        #expect(store.nextDeadline(after: now.addingTimeInterval(3)) == nil)
+        store.apply(hook(.waiting, session: "second"), at: now.addingTimeInterval(4))
+        store.apply(hook(.running, session: "second"), at: now.addingTimeInterval(4.1))
+        #expect(store.nextDeadline(after: now.addingTimeInterval(4.1)) == nil)
+    }
+
+    @Test func snapshotResultDurationTracksActiveTurnReceiveTime() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking)]), at: now)
+        store.apply(snapshot([session(phase: .waiting)], seq: 2), at: now.addingTimeInterval(2))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).first?.turnDuration == nil)
+        store.apply(snapshot([session(phase: .completed, result: SessionResult(id: "r1", outcome: "completed"))], seq: 3), at: now.addingTimeInterval(12))
+        #expect(store.drainNotices(at: now.addingTimeInterval(12)).first?.turnDuration == 12)
+        store.apply(snapshot([session(phase: .working, turn: 2)], seq: 4), at: now.addingTimeInterval(20))
+        store.apply(snapshot([session(phase: .stopped, turn: 2, result: SessionResult(id: "r2", outcome: "aborted"))], seq: 5), at: now.addingTimeInterval(24))
+        #expect(store.drainNotices(at: now.addingTimeInterval(24)).first?.turnDuration == 4)
+        store.disconnect(sourceID: "a", at: now)
+        store.apply(snapshot([session()]), at: now)
+        store.apply(snapshot([session(phase: .error, result: SessionResult(id: "unknown", outcome: "error"))], seq: 2), at: now.addingTimeInterval(10))
+        #expect(store.drainNotices(at: now.addingTimeInterval(10)).first?.turnDuration == nil)
+    }
+
+    @Test func resultForUnobservedTurnHasUnknownDuration() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking, turn: 1)]), at: now)
+        store.apply(snapshot([session(phase: .completed, turn: 2, result: SessionResult(id: "r", outcome: "completed"))], seq: 2), at: now.addingTimeInterval(30))
+        #expect(store.drainNotices(at: now.addingTimeInterval(30)).first?.turnDuration == nil)
+    }
+
+    @Test func snapshotDurationIsScopedToSourceSessionAndActiveEpisode() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking), session("other", phase: .working)]), at: now)
+        store.apply(snapshot([session(phase: .thinking)], source: "b"), at: now.addingTimeInterval(2))
+        store.apply(snapshot([session(phase: .working, turn: 2), session("other")], seq: 2), at: now.addingTimeInterval(5))
+        let result = SessionResult(id: "done", outcome: "completed")
+        store.apply(snapshot([session(phase: .completed, turn: 2, result: result), session("other", phase: .completed, result: result)], seq: 3),
+                    at: now.addingTimeInterval(12))
+        store.apply(snapshot([session(phase: .completed, result: result)], seq: 2, source: "b"), at: now.addingTimeInterval(12))
+        let notices = store.drainNotices(at: now.addingTimeInterval(12))
+        #expect(notices.map(\.sourceId) == ["a", "a", "b"])
+        #expect(notices.map(\.turnDuration) == [7, nil, 10])
+        store.apply(snapshot([session(phase: .thinking, turn: 2)], seq: 4), at: now.addingTimeInterval(20))
+        store.apply(snapshot([], seq: 5), at: now.addingTimeInterval(21))
+        store.apply(snapshot([session(phase: .completed, turn: 2, result: result)], seq: 6), at: now.addingTimeInterval(30))
+        #expect(store.drainNotices(at: now.addingTimeInterval(30)).first?.turnDuration == nil)
     }
 
 }

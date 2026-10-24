@@ -5,6 +5,7 @@ public final class PetStore {
     private struct Source {
         var snapshot: SourceSnapshot
         var resultIDs: [String: Set<String>]
+        var activeSince: [String: Date]
     }
     private struct Feedback {
         let sourceID: String
@@ -26,6 +27,8 @@ public final class PetStore {
         var turnID: String?
         var retiredTurns: [String] = []
         var turnStartedAt: Double
+        // Duration is known only after observing activity in this turn.
+        var turnStartObserved = false
         var latestOccurredAt: Double
         var phaseOccurredAt: Double
         var lastReceivedAt: Date
@@ -35,6 +38,7 @@ public final class PetStore {
         var terminal = false
         var stopOccurredAt: Double?
         var closed = false
+        var isActive: Bool { !terminal && phase != .idle }
         var waitingAt: Date?
         var waitingNotified = false
         var result: SessionResult?
@@ -44,6 +48,7 @@ public final class PetStore {
     private var hooks: [SessionKey: HookSession] = [:]
     private var feedback: Feedback?
     private var notices: [PetNotice] = []
+    private var receivedHook = false
     private var eventIDs: Set<String> = []
     private var eventOrder: [String] = []
     private var snapshotWaiting: Set<SessionKey> = []
@@ -54,6 +59,7 @@ public final class PetStore {
         if let previous = sources[snapshot.sourceId], snapshot.seq <= previous.snapshot.seq { return }
         let previous = sources[snapshot.sourceId]
         var resultIDs = previous?.resultIDs ?? [:]
+        var activeSince = previous?.activeSince ?? [:]
         let previousSessions = Dictionary(uniqueKeysWithValues: (previous?.snapshot.sessions ?? []).map { ($0.sessionId, $0) })
         let activePhases: Set<SessionPhase> = [.running, .thinking, .working, .waiting]
         if snapshot.sessions.contains(where: { session in
@@ -66,6 +72,10 @@ public final class PetStore {
         snapshotWaiting = snapshotWaiting.filter { $0.source != snapshot.sourceId || liveIDs.contains($0.session) }
         for session in snapshot.sessions {
             let key = SessionKey(source: snapshot.sourceId, session: session.sessionId)
+            if previousSessions[session.sessionId]?.turn != session.turn { activeSince.removeValue(forKey: session.sessionId) }
+            if activePhases.contains(session.phase), activeSince[session.sessionId] == nil {
+                activeSince[session.sessionId] = at
+            }
             if session.phase == .waiting {
                 if snapshotWaiting.insert(key).inserted, previous != nil {
                     recordNotice(id: "\(key.source):\(key.session):waiting:\(snapshot.seq)", source: key.source,
@@ -75,6 +85,7 @@ public final class PetStore {
             } else {
                 snapshotWaiting.remove(key)
             }
+            defer { if !activePhases.contains(session.phase) { activeSince.removeValue(forKey: session.sessionId) } }
             guard let result = session.result else { continue }
             if previous != nil, !(resultIDs[session.sessionId] ?? []).contains(result.id) {
                 let pose: PetPose
@@ -89,13 +100,14 @@ public final class PetStore {
                 default: (pose, text, kind) = (.idle, "本轮已结束", .ended)
                 }
                 recordNotice(id: "\(snapshot.sourceId):\(session.sessionId):\(result.id)", source: snapshot.sourceId,
-                             label: snapshot.sourceLabel, session: session.sessionId, kind: kind, body: text)
+                             label: snapshot.sourceLabel, session: session.sessionId, kind: kind, body: text,
+                             turnDuration: activeSince[session.sessionId].map { at.timeIntervalSince($0) })
                 showFeedback(source: snapshot.sourceId, session: session.sessionId, resultID: result.id, pose: pose, text: text, at: at)
             }
             resultIDs[session.sessionId, default: []].insert(result.id)
         }
         resultIDs = resultIDs.filter { liveIDs.contains($0.key) }
-        sources[snapshot.sourceId] = Source(snapshot: snapshot, resultIDs: resultIDs)
+        sources[snapshot.sourceId] = Source(snapshot: snapshot, resultIDs: resultIDs, activeSince: activeSince.filter { liveIDs.contains($0.key) })
         if let current = feedback, current.sourceID == snapshot.sourceId,
            !snapshot.sessions.contains(where: { $0.sessionId == current.sessionID && $0.result?.id == current.resultID }) {
             feedback = nil
@@ -104,6 +116,7 @@ public final class PetStore {
 
     public func apply(_ event: PetActivityEvent, at: Date = Date()) {
         pruneHooks(at: at)
+        receivedHook = true
         let dedupeID = "\(event.sourceId):\(event.sessionId):\(event.eventId)"
         guard eventIDs.insert(dedupeID).inserted else { return }
         eventOrder.append(dedupeID)
@@ -119,6 +132,7 @@ public final class PetStore {
             if state.retiredTurns.count > 32 { state.retiredTurns.removeFirst() }
             state.turnID = turnID
             state.turnStartedAt = event.occurredAt
+            state.turnStartObserved = false
             state.phaseOccurredAt = event.occurredAt
             state.phase = .idle
             state.tools = []
@@ -160,6 +174,7 @@ public final class PetStore {
         case .sessionStarted:
             break
         case .turnStarted, .running:
+            state.turnStartObserved = true
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
             state.phase = event.kind == .running ? .running : state.tools.isEmpty ? .thinking : .working
@@ -167,6 +182,7 @@ public final class PetStore {
             state.waitingNotified = false
             if feedback?.sourceID == event.sourceId && feedback?.sessionID == event.sessionId { feedback = nil }
         case .toolStarted:
+            state.turnStartObserved = true
             if let toolID = event.toolId, !state.finishedTools.contains(toolID), state.tools.count < 512 {
                 state.tools.insert(toolID)
             }
@@ -176,6 +192,7 @@ public final class PetStore {
             state.waitingAt = nil
             state.waitingNotified = false
         case .toolFinished:
+            state.turnStartObserved = true
             finishTool(event.toolId, state: &state)
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
@@ -183,6 +200,7 @@ public final class PetStore {
             state.waitingAt = nil
             state.waitingNotified = false
         case .waiting:
+            state.turnStartObserved = true
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
             if state.waitingAt == nil { state.waitingAt = at }
@@ -222,7 +240,8 @@ public final class PetStore {
             // A Stop can notify again only after observed same-turn activity.
             if shouldNotify {
                 recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
-                             session: event.sessionId, kind: kind, body: body)
+                             session: event.sessionId, kind: kind, body: body,
+                             turnDuration: state.turnStartObserved ? event.occurredAt - state.turnStartedAt : nil)
                 showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
                              text: body, sourceLabel: event.provider.title, at: at)
             }
@@ -263,9 +282,18 @@ public final class PetStore {
         return result
     }
 
-    private func recordNotice(id: String, source: String, label: String, session: String, kind: PetNoticeKind, body: String) {
+    public func nextDeadline(after at: Date) -> Date? {
+        let waiting = hooks.values.compactMap { state -> Date? in
+            guard state.isActive, !state.waitingNotified, at.timeIntervalSince(state.lastReceivedAt) < 900 else { return nil }
+            return state.waitingAt?.addingTimeInterval(0.3)
+        }
+        return (waiting + [feedback?.expiresAt].compactMap { $0 }).filter { $0 > at }.min()
+    }
+
+    private func recordNotice(id: String, source: String, label: String, session: String, kind: PetNoticeKind, body: String,
+                              turnDuration: TimeInterval? = nil) {
         notices.append(PetNotice(id: id, sourceId: source, sourceLabel: label, sessionId: session,
-                                 kind: kind, title: "\(label) 会话提醒", body: body))
+                                 kind: kind, title: "\(label) 会话提醒", body: body, turnDuration: turnDuration))
     }
 
     private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, text: String, sourceLabel: String? = nil, at: Date) {
@@ -297,10 +325,10 @@ public final class PetStore {
         }
         sessions += hooks.keys.filter { key in
             let state = hooks[key]!
-            return !state.closed && (!state.terminal || at.timeIntervalSince(state.lastReceivedAt) < 900)
+            return !state.closed && (state.isActive || at.timeIntervalSince(state.lastReceivedAt) < 900)
         }.sorted { ($0.source, $0.session) < ($1.source, $1.session) }.map { key in
             let state = hooks[key]!
-            let stale = !state.terminal && at.timeIntervalSince(state.lastReceivedAt) >= 900
+            let stale = state.isActive && at.timeIntervalSince(state.lastReceivedAt) >= 900
             let pending = state.waitingAt.map { at.timeIntervalSince($0) >= 0.3 } ?? false
             let phase: SessionPhase = stale ? .idle : state.phase == .waiting && !pending ? .thinking : state.phase
             return PresentedSession(sourceId: key.source, sourceLabel: state.provider.title,
@@ -328,7 +356,7 @@ public final class PetStore {
             text = current.displayText
         } else {
             pose = .idle
-            text = sessions.contains(where: \.isStale) ? "状态待确认" : sources.isEmpty && sessions.isEmpty ? "未连接宿主" : "准备就绪"
+            text = sessions.contains(where: \.isStale) ? "状态待确认" : !receivedHook && sources.isEmpty && sessions.isEmpty ? "未连接宿主" : "准备就绪"
         }
         return PetPresentation(pose: pose, text: text, activeCount: activeCount,
                                waitingCount: waitingCount, connectedSources: sources.count + Set(sessions.filter { $0.sourceId.hasPrefix("hook:") }.map(\.sourceId)).count, sessions: sessions,

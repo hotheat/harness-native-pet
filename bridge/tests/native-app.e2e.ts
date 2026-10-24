@@ -58,7 +58,7 @@ class NativeE2EProvider extends LlmAdapter {
 function launch(binary: string, capture: string, runtimeDirectory: string, switching: boolean) {
   // Capture before the three-second completion feedback expires.
   const args = switching ? ['--capture-skin-switch', resolve(capture, '..')] : ['--capture-live', capture, '--capture-after', '2']
-  const child = spawn(binary, [...args, '-pet.skin', 'character', '-pet.animations', 'YES', '-pet.visible', 'YES', '-pet.size', 'medium'], {
+  const child = spawn(binary, [...args, '-pet.skin', 'character', '-pet.animations', 'YES', '-pet.visible', 'YES', '-pet.size', 'medium', '-pet.noticeMinimumSeconds', '0'], {
     env: { ...process.env, DSH_NATIVE_PET_RUNTIME_DIR: runtimeDirectory },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

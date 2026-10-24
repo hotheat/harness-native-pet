@@ -17,14 +17,14 @@ helper = args.app.resolve() / 'Contents/MacOS/pet-hook'
 out = args.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
 results = []
-for scenario in ['parallel-ended', 'waiting', 'closed-ended']:
+for scenario in ['parallel-ended', 'waiting', 'closed-ended', 'continued-ended']:
     with tempfile.TemporaryDirectory(prefix='dnp-ha-', dir='/tmp') as directory:
         env = {**os.environ, 'DSH_NATIVE_PET_RUNTIME_DIR': directory}
         capture = out / (scenario + '.png')
         notices = out / (scenario + '.jsonl')
         process = subprocess.Popen([str(app), '--capture-live', str(capture), '--capture-after', '2',
                                     '--notification-log', str(notices), '-pet.skin', 'dshPet',
-                                    '-pet.size', 'medium', '-pet.visible', 'YES', '-pet.systemNotifications', 'YES'],
+                                    '-pet.size', 'medium', '-pet.noticeMinimumSeconds', '0', '-pet.visible', 'YES', '-pet.systemNotifications', 'YES'],
                                    env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         def send(host, event, session='same-name', turn='turn-a', **fields):
             payload = {'hook_event_name': event, 'session_id': session,
@@ -48,6 +48,12 @@ for scenario in ['parallel-ended', 'waiting', 'closed-ended']:
             elif scenario == 'waiting':
                 send('claude-code', 'UserPromptSubmit')
                 send('claude-code', 'PermissionRequest', tool_name='Bash')
+            elif scenario == 'continued-ended':
+                send('codex', 'UserPromptSubmit')
+                send('codex', 'Stop', last_assistant_message='initial response')
+                send('codex', 'PreToolUse', tool_use_id='continued-tool')
+                send('codex', 'PostToolUse', tool_use_id='continued-tool')
+                send('codex', 'Stop', last_assistant_message='continued response')
             else:
                 send('codex', 'Stop', last_assistant_message='fixture response')
                 send('codex', 'SessionEnd')
@@ -55,7 +61,7 @@ for scenario in ['parallel-ended', 'waiting', 'closed-ended']:
             assert process.returncode == 0, stderr
             evidence = json.loads(capture.with_suffix('.json').read_text())
             records = [json.loads(line) for line in notices.read_text().splitlines()]
-            assert len(records) == 1, records
+            assert len(records) == (2 if scenario == 'continued-ended' else 1), records
             assert evidence['characterHeight'] == 100
             assert evidence['skin'] == 'dshPet'
             if scenario == 'parallel-ended':
@@ -68,7 +74,7 @@ for scenario in ['parallel-ended', 'waiting', 'closed-ended']:
             else:
                 assert evidence['storePose'] == 'completed', evidence
                 assert 'Codex' in evidence['displayText'] and '结束' in evidence['displayText'], evidence
-                assert records[0]['kind'] == 'ended'
+                assert all(record['kind'] == 'ended' and record['sourceLabel'] == 'Codex' for record in records)
             results.append({'scenario': scenario, 'passed': True, 'capture': str(capture), 'notices': records,
                             'state': evidence, 'stdout': stdout, 'stderr': stderr})
             print(f'{scenario}: passed', flush=True)

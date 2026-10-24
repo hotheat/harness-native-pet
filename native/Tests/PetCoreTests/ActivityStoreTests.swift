@@ -26,6 +26,23 @@ struct ActivityStoreTests {
         #expect(store.drainNotices(at: now).isEmpty)
     }
 
+    @Test func firstStopHasUnknownTurnDuration() throws {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        let notices = store.drainNotices(at: now)
+        #expect(notices.count == 1)
+        #expect(try #require(notices.first).turnDuration == nil)
+    }
+
+    @Test func startedTurnRecordsMeasuredDuration() throws {
+        let store = PetStore()
+        store.apply(event(.turnStarted), at: now)
+        store.apply(event(.turnEnded, time: 1012), at: now.addingTimeInterval(12))
+        let notices = store.drainNotices(at: now.addingTimeInterval(12))
+        #expect(notices.count == 1)
+        #expect(try #require(notices.first).turnDuration == 12)
+    }
+
     @Test func stopThenFailureNotifiesErrorOnceAndUpdatesFeedback() {
         let store = PetStore()
         store.apply(event(.turnEnded, id: "stop"), at: now)
@@ -71,6 +88,44 @@ struct ActivityStoreTests {
         #expect(sessions.count == 2)
         #expect(Set(sessions.map(\.sourceId)) == ["hook:codex", "hook:claudeCode"])
         #expect(store.presentation(at: now).activeCount == 1)
+    }
+
+    @Test func idleAndTerminalSessionsExpireWithoutBecomingStale() {
+        for kind in [PetActivityKind.turnEnded, .failed, .interrupted, .sessionStarted] {
+            let store = PetStore()
+            store.apply(event(kind, turn: kind == .sessionStarted ? nil : "t1"), at: now)
+            let value = store.presentation(at: now.addingTimeInterval(899))
+            #expect(value.sessions.count == 1)
+            #expect(value.sessions.first?.isStale == false)
+            #expect(value.text == "准备就绪")
+            let expired = store.presentation(at: now.addingTimeInterval(900))
+            #expect(expired.sessions.isEmpty)
+            #expect(expired.text == "准备就绪")
+        }
+    }
+
+    @Test func hookReceiptKeepsEmptyStateReadyAfterCloseAndPruning() {
+        let store = PetStore()
+        #expect(store.presentation(at: now).text == "未连接宿主")
+        store.apply(event(.sessionStarted, turn: nil), at: now)
+        store.apply(event(.sessionEnded, turn: nil), at: now.addingTimeInterval(1))
+        #expect(store.presentation(at: now.addingTimeInterval(1)).text == "准备就绪")
+        #expect(store.presentation(at: now.addingTimeInterval(86_401)).text == "准备就绪")
+    }
+
+    @Test func hookDurationUsesEventTimeFromTurnStartAndWaitingHasNoDuration() {
+        let store = PetStore()
+        store.apply(event(.sessionStarted, turn: nil, time: 900), at: now)
+        store.apply(event(.turnStarted), at: now.addingTimeInterval(50))
+        store.apply(event(.waiting, time: 1001), at: now.addingTimeInterval(60))
+        let waiting = store.drainNotices(at: now.addingTimeInterval(60.31))
+        #expect(waiting.map(\.kind) == [.waiting])
+        #expect(waiting.first?.turnDuration == nil)
+        store.apply(event(.turnEnded, time: 1012), at: now.addingTimeInterval(100))
+        #expect(store.drainNotices(at: now.addingTimeInterval(100)).first?.turnDuration == 12)
+        store.apply(event(.turnStarted, turn: "t2", time: 1020), at: now.addingTimeInterval(110))
+        store.apply(event(.interrupted, turn: "t2", time: 1024), at: now.addingTimeInterval(120))
+        #expect(store.drainNotices(at: now.addingTimeInterval(120)).first?.turnDuration == 4)
     }
 
     @Test func parallelToolsAndFinishBeforeStartAreCountedByIdentity() {
@@ -291,7 +346,7 @@ struct ActivityStoreTests {
             let expired = store.presentation(at: now.addingTimeInterval(901))
             #expect(expired.sessions.isEmpty)
             #expect(expired.connectedSources == 0)
-            #expect(expired.text == "未连接宿主")
+            #expect(expired.text == "准备就绪")
             store.apply(event(kind), at: now.addingTimeInterval(902))
             #expect(store.drainNotices(at: now.addingTimeInterval(902)).count == 1)
         }
