@@ -26,6 +26,42 @@ struct ActivityStoreTests {
         #expect(store.drainNotices(at: now).isEmpty)
     }
 
+    @Test func stopThenFailureNotifiesErrorOnceAndUpdatesFeedback() {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        #expect(store.drainNotices(at: now).map(\.kind) == [.ended])
+        store.apply(event(.failed, id: "failure", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.error])
+        let presentation = store.presentation(at: now.addingTimeInterval(1))
+        #expect(presentation.pose == .error)
+        #expect(presentation.feedback?.pose == .error)
+        #expect(presentation.feedback?.text == "本轮回应出错，请查看 Codex")
+        store.apply(event(.failed, id: "failure-again", time: 1002), at: now.addingTimeInterval(2))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
+    }
+
+    @Test func stopThenInterruptNotifiesInterruptedOnceAndUpdatesFeedback() {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        #expect(store.drainNotices(at: now).map(\.kind) == [.ended])
+        store.apply(event(.interrupted, id: "interrupt", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.interrupted])
+        let presentation = store.presentation(at: now.addingTimeInterval(1))
+        #expect(presentation.pose == .idle)
+        #expect(presentation.sessions.first?.phase == .stopped)
+        #expect(presentation.feedback?.text == "本轮回应已中断")
+        store.apply(event(.interrupted, id: "interrupt-again", time: 1002), at: now.addingTimeInterval(2))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
+    }
+
+    @Test func repeatedFailuresWithDifferentEventIDsNotifyOnce() {
+        let store = PetStore()
+        store.apply(event(.failed, id: "failure"), at: now)
+        store.apply(event(.failed, id: "failure-again", time: 1001), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.error])
+        #expect(store.presentation(at: now.addingTimeInterval(1)).pose == .error)
+    }
+
     @Test func sessionStartIsIdleAndSameSessionAcrossProvidersIsDistinct() {
         let store = PetStore()
         store.apply(event(.sessionStarted, provider: .claudeCode, turn: nil), at: now)

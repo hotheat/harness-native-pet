@@ -155,7 +155,7 @@ public final class PetStore {
             state.result = nil
             if feedback?.sourceID == event.sourceId && feedback?.sessionID == event.sessionId { feedback = nil }
         }
-        let shouldNotify = !state.terminal
+        let shouldNotify = !state.terminal || (state.stopOccurredAt != nil && event.kind != .turnEnded)
         switch event.kind {
         case .sessionStarted:
             break
