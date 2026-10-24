@@ -246,11 +246,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if pose == .sleeping {
             return presentation.connectedSources == 0 ? "休息中 · 暂无宿主状态" : "休息中"
         }
-        if presentation.activeCount > 0 {
-            return presentation.text
-                .replacingOccurrences(of: "：本轮回应已结束，", with: "\n本轮结束 · ")
-                .replacingOccurrences(of: " 个会话仍在执行", with: " 执行中")
-                .replacingOccurrences(of: " 个会话仍在思考", with: " 思考中")
+        if presentation.activeCount > 0, let feedback = presentation.feedback, feedback.pose == .completed,
+           pose == .working || pose == .thinking {
+            let remaining = "\(presentation.activeCount) " + (pose == .working ? "执行中" : "思考中")
+            if let source = feedback.sourceLabel { return "\(source)\n本轮结束 · \(remaining)" }
+            return "\(feedback.text)，\(remaining)"
         }
         return presentation.text
     }

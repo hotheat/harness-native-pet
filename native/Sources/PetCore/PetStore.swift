@@ -12,6 +12,8 @@ public final class PetStore {
         let resultID: String?
         let pose: PetPose
         let text: String
+        let sourceLabel: String?
+        var displayText: String { sourceLabel.map { "\($0)：\(text)" } ?? text }
         let expiresAt: Date
     }
     private struct SessionKey: Hashable {
@@ -222,7 +224,7 @@ public final class PetStore {
                 recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
                              session: event.sessionId, kind: kind, body: body)
                 showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
-                             text: "\(event.provider.title)：\(body)", at: at)
+                             text: body, sourceLabel: event.provider.title, at: at)
             }
         case .sessionEnded:
             break
@@ -266,9 +268,9 @@ public final class PetStore {
                                  kind: kind, title: "\(label) 会话提醒", body: body))
     }
 
-    private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, text: String, at: Date) {
+    private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, text: String, sourceLabel: String? = nil, at: Date) {
         if pose == .error || feedback.map({ $0.pose != .error || $0.expiresAt <= at }) ?? true {
-            feedback = Feedback(sourceID: source, sessionID: session, resultID: resultID, pose: pose, text: text, expiresAt: at.addingTimeInterval(3))
+            feedback = Feedback(sourceID: source, sessionID: session, resultID: resultID, pose: pose, text: text, sourceLabel: sourceLabel, expiresAt: at.addingTimeInterval(3))
         }
     }
 
@@ -317,18 +319,19 @@ public final class PetStore {
             text = "\(waitingCount) 个会话待处理，请查看 \(labels)" + (activeCount > 0 ? "，\(activeCount) 个仍在执行" : "")
         } else if sessions.contains(where: { [.working, .running].contains($0.phase) || $0.activeTools > 0 }) {
             pose = .working
-            text = feedback?.pose == .completed ? "\(feedback!.text)，\(activeCount) 个会话仍在执行" : "\(activeCount) 个会话正在执行"
+            text = feedback?.pose == .completed ? "\(feedback!.displayText)，\(activeCount) 个会话仍在执行" : "\(activeCount) 个会话正在执行"
         } else if sessions.contains(where: { $0.phase == .thinking }) {
             pose = .thinking
-            text = feedback?.pose == .completed ? "\(feedback!.text)，\(activeCount) 个会话仍在思考" : "正在思考"
+            text = feedback?.pose == .completed ? "\(feedback!.displayText)，\(activeCount) 个会话仍在思考" : "正在思考"
         } else if let current = feedback {
             pose = current.pose
-            text = current.text
+            text = current.displayText
         } else {
             pose = .idle
             text = sessions.contains(where: \.isStale) ? "状态待确认" : sources.isEmpty && sessions.isEmpty ? "未连接宿主" : "准备就绪"
         }
         return PetPresentation(pose: pose, text: text, activeCount: activeCount,
-                               waitingCount: waitingCount, connectedSources: sources.count + Set(sessions.filter { $0.sourceId.hasPrefix("hook:") }.map(\.sourceId)).count, sessions: sessions)
+                               waitingCount: waitingCount, connectedSources: sources.count + Set(sessions.filter { $0.sourceId.hasPrefix("hook:") }.map(\.sourceId)).count, sessions: sessions,
+                               feedback: feedback.map { PresentedFeedback(pose: $0.pose, text: $0.text, sourceLabel: $0.sourceLabel) })
     }
 }

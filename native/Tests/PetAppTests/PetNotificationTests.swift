@@ -188,6 +188,41 @@ struct PetNotificationTests {
         try png.write(to: URL(fileURLWithPath: "/tmp/afk-ui-parallel-short.png"))
     }
 
+    @Test func structuredFeedbackKeepsSingleAndParallelText() {
+        for provider in [PetProvider.codex, .claudeCode] {
+            let store = PetStore()
+            store.apply(event(.turnEnded, id: "stop", provider: provider), at: now)
+            let single = store.presentation(at: now)
+            #expect(single.feedback == PresentedFeedback(pose: .completed, text: "本轮回应已结束", sourceLabel: provider.title))
+            #expect(AppDelegate.presentationText(single, pose: single.pose) == "\(provider.title)：本轮回应已结束")
+            store.apply(event(.running, id: "other", session: "other"), at: now)
+            let parallel = store.presentation(at: now)
+            #expect(AppDelegate.presentationText(parallel, pose: parallel.pose) == "\(provider.title)\n本轮结束 · 1 执行中")
+        }
+        for phase in [SessionPhase.working, .thinking] {
+            let store = PetStore()
+            let busy = SessionSnapshot(sessionId: "busy", turn: 1, phase: phase, activeTools: 0, pendingApprovals: 0, result: nil)
+            store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 1, sessions: [busy]), at: now)
+            let completed = SessionSnapshot(sessionId: "done", turn: 1, phase: .completed, activeTools: 0, pendingApprovals: 0,
+                                            result: SessionResult(id: "r", outcome: "completed"))
+            store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 2, sessions: [busy, completed]), at: now)
+            let state = store.presentation(at: now)
+            #expect(state.feedback == PresentedFeedback(pose: .completed, text: "任务已完成", sourceLabel: nil))
+            #expect(AppDelegate.presentationText(state, pose: state.pose) == "任务已完成，1 \(phase == .working ? "执行中" : "思考中")")
+        }
+    }
+
+    @Test func terminalSettingsRowsExpireWithoutUncertainty() {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        let model = PetStatusModel()
+        model.update(store.presentation(at: now.addingTimeInterval(899)))
+        #expect(model.sessionRows.first?.detail == "本轮回应结束 · 工具 0 · 待决定 0")
+        model.update(store.presentation(at: now.addingTimeInterval(901)))
+        #expect(model.sessionRows.isEmpty)
+        #expect(model.sourceLabels.isEmpty)
+    }
+
     @Test func staleSessionShowsUncertainty() {
         let store = PetStore()
         store.apply(event(.turnStarted, id: "start"), at: now)

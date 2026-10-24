@@ -129,21 +129,35 @@ public struct PresentedSession: Equatable, Sendable {
     }
 }
 
+public struct PresentedFeedback: Equatable, Sendable {
+    public let pose: PetPose
+    public let text: String
+    public let sourceLabel: String?
+
+    public init(pose: PetPose, text: String, sourceLabel: String?) {
+        self.pose = pose
+        self.text = text
+        self.sourceLabel = sourceLabel
+    }
+}
+
 public struct PetPresentation: Sendable {
     public let pose: PetPose
     public let text: String
     public let activeCount: Int
     public let waitingCount: Int
     public let connectedSources: Int
+    public let feedback: PresentedFeedback?
     public let sessions: [PresentedSession]
 
     public init(pose: PetPose, text: String, activeCount: Int, waitingCount: Int,
-                connectedSources: Int, sessions: [PresentedSession]) {
+                connectedSources: Int, sessions: [PresentedSession], feedback: PresentedFeedback?) {
         self.pose = pose
         self.text = text
         self.activeCount = activeCount
         self.waitingCount = waitingCount
         self.connectedSources = connectedSources
+        self.feedback = feedback
         self.sessions = sessions
     }
 }
