@@ -53,9 +53,10 @@ jobs:
             gh release create "$tag" "${assets[@]}" --title "$title" \
               --notes "$notes" --target "$GITHUB_SHA" --latest
 
-            gh api --paginate --slurp "repos/${GH_REPO}/releases?per_page=100" \
-              --jq 'add | map(select(.tag_name | startswith("build-"))) | sort_by(.created_at) | reverse | .[10:][] | .tag_name' |
+            gh release list --limit 100 --json tagName,createdAt \
+              --jq 'map(select(.tagName | startswith("build-"))) | sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
               while IFS= read -r old_tag; do
+                [ -n "$old_tag" ] || continue
                 gh release delete "$old_tag" --yes --cleanup-tag
               done
           fi
