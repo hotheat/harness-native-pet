@@ -33,3 +33,11 @@ test('encoded size uses UTF-8 bytes and limits only at IO', () => {
   message.sourceLabel = 'DSH'
   assert.doesNotThrow(() => encodeMessage(message))
 })
+
+test('snapshot rejects duplicate sessionId', () => {
+  const session = { sessionId: 'same', turn: 1, phase: 'thinking', activeTools: 0, pendingApprovals: 0, result: null }
+  const message = { type: 'snapshot', sourceId: 'dsh', sourceLabel: 'DSH', seq: 1, sessions: [session, { ...session, turn: 2 }] }
+  assert.equal(validate(message), true)
+  assert.throws(() => decodeMessage(message), /session snapshot/)
+  assert.doesNotThrow(() => decodeMessage({ ...message, sessions: [session, { ...session, sessionId: 'other' }] }))
+})

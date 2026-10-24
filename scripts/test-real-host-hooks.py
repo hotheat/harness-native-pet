@@ -263,7 +263,7 @@ def main():
             cwd = prepare(home, args.app.resolve(), target, events_log)
             result['version'] = subprocess.check_output([binary, '--version'], env=env, text=True, timeout=10).strip()
             with (evidence / 'app.stdout').open('w') as out, (evidence / 'app.stderr').open('w') as err:
-                app_process = subprocess.Popen([str(args.app.resolve() / 'Contents/MacOS/DSHNativePet'), '--notification-log', str(notices), '-pet.visible', 'NO', '-pet.skin', 'character', '-pet.systemNotifications', 'YES'], env=env, cwd=cwd, stdout=out, stderr=err, start_new_session=True)
+                app_process = subprocess.Popen([str(args.app.resolve() / 'Contents/MacOS/DSHNativePet'), '--notification-log', str(notices), '-pet.visible', 'NO', '-pet.skin', 'character', '-pet.systemNotifications', 'YES', '-pet.noticeMinimumSeconds', '0'], env=env, cwd=cwd, stdout=out, stderr=err, start_new_session=True)
                 deadline = time.monotonic() + 10
                 while not (runtime / 'pet.sock').exists() and time.monotonic() < deadline:
                     if app_process.poll() is not None:
