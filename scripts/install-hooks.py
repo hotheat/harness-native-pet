@@ -65,6 +65,19 @@ def atomic_write(path, content, mode=0o600):
             os.unlink(temporary)
 
 
+def install_helper(source, destination):
+    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix='.pet-hook-', dir=destination.parent)
+    os.close(fd)
+    try:
+        shutil.copy2(source, temporary)
+        os.chmod(temporary, 0o700)
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', type=Path, help='Path to DSH Native Pet.app')
@@ -93,9 +106,7 @@ def main():
         if merged != config:
             updates.append((path, json.dumps(merged, ensure_ascii=False, indent=2) + '\n'))
     if not args.uninstall:
-        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        shutil.copy2(source, destination)
-        destination.chmod(0o700)
+        install_helper(source, destination)
     for path, content in updates:
         mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
         if path.exists():

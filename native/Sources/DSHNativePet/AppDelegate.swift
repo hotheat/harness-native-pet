@@ -185,7 +185,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shutdown()
             NSApp.terminate(nil)
             return false
-        } catch { status.connectionError = error.localizedDescription }
+        } catch {
+            fail(error)
+            return false
+        }
         return true
     }
 
