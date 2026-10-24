@@ -27,6 +27,8 @@ public final class PetStore {
         var turnID: String?
         var retiredTurns: [String] = []
         var turnStartedAt: Double
+        // Duration is known only after observing activity in this turn.
+        var turnStartObserved = false
         var latestOccurredAt: Double
         var phaseOccurredAt: Double
         var lastReceivedAt: Date
@@ -130,6 +132,7 @@ public final class PetStore {
             if state.retiredTurns.count > 32 { state.retiredTurns.removeFirst() }
             state.turnID = turnID
             state.turnStartedAt = event.occurredAt
+            state.turnStartObserved = false
             state.phaseOccurredAt = event.occurredAt
             state.phase = .idle
             state.tools = []
@@ -171,6 +174,7 @@ public final class PetStore {
         case .sessionStarted:
             break
         case .turnStarted, .running:
+            state.turnStartObserved = true
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
             state.phase = event.kind == .running ? .running : state.tools.isEmpty ? .thinking : .working
@@ -178,6 +182,7 @@ public final class PetStore {
             state.waitingNotified = false
             if feedback?.sourceID == event.sourceId && feedback?.sessionID == event.sessionId { feedback = nil }
         case .toolStarted:
+            state.turnStartObserved = true
             if let toolID = event.toolId, !state.finishedTools.contains(toolID), state.tools.count < 512 {
                 state.tools.insert(toolID)
             }
@@ -187,6 +192,7 @@ public final class PetStore {
             state.waitingAt = nil
             state.waitingNotified = false
         case .toolFinished:
+            state.turnStartObserved = true
             finishTool(event.toolId, state: &state)
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
@@ -194,6 +200,7 @@ public final class PetStore {
             state.waitingAt = nil
             state.waitingNotified = false
         case .waiting:
+            state.turnStartObserved = true
             guard event.occurredAt >= state.phaseOccurredAt else { break }
             state.phaseOccurredAt = event.occurredAt
             if state.waitingAt == nil { state.waitingAt = at }
@@ -234,7 +241,7 @@ public final class PetStore {
             if shouldNotify {
                 recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
                              session: event.sessionId, kind: kind, body: body,
-                             turnDuration: event.occurredAt - state.turnStartedAt)
+                             turnDuration: state.turnStartObserved ? event.occurredAt - state.turnStartedAt : nil)
                 showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
                              text: body, sourceLabel: event.provider.title, at: at)
             }

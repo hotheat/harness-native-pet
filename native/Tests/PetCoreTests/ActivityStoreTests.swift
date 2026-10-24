@@ -26,6 +26,23 @@ struct ActivityStoreTests {
         #expect(store.drainNotices(at: now).isEmpty)
     }
 
+    @Test func firstStopHasUnknownTurnDuration() throws {
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        let notices = store.drainNotices(at: now)
+        #expect(notices.count == 1)
+        #expect(try #require(notices.first).turnDuration == nil)
+    }
+
+    @Test func startedTurnRecordsMeasuredDuration() throws {
+        let store = PetStore()
+        store.apply(event(.turnStarted), at: now)
+        store.apply(event(.turnEnded, time: 1012), at: now.addingTimeInterval(12))
+        let notices = store.drainNotices(at: now.addingTimeInterval(12))
+        #expect(notices.count == 1)
+        #expect(try #require(notices.first).turnDuration == 12)
+    }
+
     @Test func stopThenFailureNotifiesErrorOnceAndUpdatesFeedback() {
         let store = PetStore()
         store.apply(event(.turnEnded, id: "stop"), at: now)

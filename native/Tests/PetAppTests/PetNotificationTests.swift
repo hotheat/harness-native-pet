@@ -274,6 +274,32 @@ struct PetNotificationTests {
         #expect(dispatcher.requestCount == 4)
     }
 
+    @Test func firstStopBypassesDurationThreshold() throws {
+        let adapter = try RecordingPetNotificationAdapter()
+        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+        let store = PetStore()
+        store.apply(event(.turnEnded, id: "stop"), at: now)
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now)
+        #expect(adapter.notices.count == 1)
+        #expect(dispatcher.requestCount == 1)
+        let notice = try #require(adapter.notices.first)
+        #expect(notice.kind == .ended)
+        #expect(notice.turnDuration == nil)
+    }
+
+    @Test func firstInterruptionBypassesDurationThreshold() throws {
+        let adapter = try RecordingPetNotificationAdapter()
+        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+        let store = PetStore()
+        store.apply(event(.interrupted, id: "interrupt"), at: now)
+        dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now)
+        #expect(adapter.notices.count == 1)
+        #expect(dispatcher.requestCount == 1)
+        let notice = try #require(adapter.notices.first)
+        #expect(notice.kind == .interrupted)
+        #expect(notice.turnDuration == nil)
+    }
+
     @Test func unknownDurationIsSubmittedAndResultContentIsSilent() throws {
         let adapter = try RecordingPetNotificationAdapter()
         let dispatcher = PetNotificationDispatcher(adapter: adapter)
