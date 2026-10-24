@@ -1,0 +1,109 @@
+{
+  "generationDate" : "2026-10-23",
+  "generationTool" : "Codex built-in image_gen",
+  "outputs" : {
+    "completed.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "0a7610d5e7e354dabd8f4fdfd4265a01aae653c7137358712edc3168d52a0a15",
+      "transparentPixelCount" : 1136362,
+      "width" : 1254
+    },
+    "drag.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "150d178d1fc6cd84aa1d15bcaf94660bac8cc1a49b658c1f28cbe3e91b344c51",
+      "transparentPixelCount" : 1112157,
+      "width" : 1254
+    },
+    "error.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "a16c7f4fbed25d8b2b3186ff3fd0dd8fd5be1dfdae39a4bc41085bb1f4adf36d",
+      "transparentPixelCount" : 1169595,
+      "width" : 1254
+    },
+    "idle.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "8a426dc91b03fc0040e48374920680eae43ef4177ed1dd10c3fae4e6ada81f9c",
+      "transparentPixelCount" : 1099805,
+      "width" : 1254
+    },
+    "poke.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "780b855bba428a75b475d99dc1d72cbdacc9f0bdd08de371c0fd2f123988fe20",
+      "transparentPixelCount" : 1136198,
+      "width" : 1254
+    },
+    "sleeping.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "5c571cf413b18d8485687a3db322648e523d4f45e0d6ff582e975e48eec158ea",
+      "transparentPixelCount" : 1195898,
+      "width" : 1254
+    },
+    "thinking.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "425cdba21981e9c64e8335105619f1eb81c9ac69b79f35474539471ca9ea9a29",
+      "transparentPixelCount" : 1171869,
+      "width" : 1254
+    },
+    "waiting.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "82a640cf0f475a2b1aa822c9ec4360a5adda4b5f42f6a6927a79a3d048769538",
+      "transparentPixelCount" : 1180578,
+      "width" : 1254
+    },
+    "working.png" : {
+      "hasAlpha" : true,
+      "height" : 1254,
+      "sha256" : "7cf5c935611ea9e46a03ad6f4d741c28510ec18f8bf145de97018893cde194aa",
+      "transparentPixelCount" : 1153283,
+      "width" : 1254
+    }
+  },
+  "referenceDirectory" : "references",
+  "sourceDirectory" : "\/Users\/jiaoguo\/github\/hanzi-evolution-atlas\/designs\/ip-assets\/two-head-q-girl",
+  "sources" : {
+    "expressions\/01-happy-wave.png" : {
+      "bytes" : 1591540,
+      "sha256" : "4074af6ade25d734050db490acdd282d9045fa76cc9a50298f16647fff972776"
+    },
+    "expressions\/02-surprised.png" : {
+      "bytes" : 1486914,
+      "sha256" : "60523b0c2dabb22358de71ea9e039a78403e810999f155844a800471f09af178"
+    },
+    "expressions\/03-thinking.png" : {
+      "bytes" : 1534000,
+      "sha256" : "d14a7948eb8da55fb1b02ad22397ea793b635a31a9c60ae8fe82d36767c728a7"
+    },
+    "expressions\/04-pouting.png" : {
+      "bytes" : 1507863,
+      "sha256" : "f8a41bda00adac75f4cae280f5a76dd35ab1c593f88059be8896aa66c3179c94"
+    },
+    "expressions\/06-thumbs-up.png" : {
+      "bytes" : 1538269,
+      "sha256" : "2dd9ea8be87826e6861cd736ebe267d858afcae0e322eac99bc3d887f84c41ed"
+    },
+    "expressions\/07-sleepy-yawn.png" : {
+      "bytes" : 1532118,
+      "sha256" : "8d90969187aef67267b0f4a409db263a450636cc42a3a1a45b18319a6c81a26d"
+    },
+    "front-full-body.png" : {
+      "bytes" : 1621176,
+      "sha256" : "2e5bb4b8109dcb8d4f65969a50cb9bf522516098babf37d7c5bed46aa8c3e797"
+    },
+    "IP_DNA.md" : {
+      "bytes" : 5447,
+      "sha256" : "828cbc97a8f415ec2fee765c8578d144fb52e3bc0414dec146290dac2f734ba1"
+    },
+    "three-view.png" : {
+      "bytes" : 1636563,
+      "sha256" : "5fbc79607e1b5919fefdd47867ca65003dd87dff497258c53d0b9502da64a7c7"
+    }
+  }
+}

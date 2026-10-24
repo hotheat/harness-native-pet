@@ -1,0 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+const root = new URL('../', import.meta.url);
+const require = createRequire(new URL('bridge/package.json', root));
+const Ajv = require('ajv');
+const json = path => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
+const validate = new Ajv({allErrors: true, strict: true}).compile(json('contracts/bridge.schema.json'));
+for (const {name,message} of [...json('contracts/fixtures/snapshots.json'), ...json('contracts/fixtures/activity.json')]) assert(validate(message), `${name}: ${JSON.stringify(validate.errors)}`);
+for (const {name,message} of json('contracts/fixtures/invalid-messages.json')) assert(!validate(message), `${name} was accepted`);
+console.log('Shared schema fixtures passed');

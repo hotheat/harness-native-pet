@@ -1,0 +1,224 @@
+[
+  {
+    "name": "zero-seq",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 0,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "unsafe-seq",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 9007199254740992,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "fractional-seq",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 1.5,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-source",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-top-level-field",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ],
+      "secret": "not-accepted"
+    }
+  },
+  {
+    "name": "missing-label",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-phase",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "approved",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative-count",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": -1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "wrong-result",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": {
+            "id": "r1",
+            "outcome": "success"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-session-field",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "turn": 1,
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null,
+          "prompt": "private"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-nullable-turn",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "source-a",
+      "sourceLabel": "DSH",
+      "seq": 2,
+      "sessions": [
+        {
+          "sessionId": "session-a",
+          "phase": "working",
+          "activeTools": 1,
+          "pendingApprovals": 0,
+          "result": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "hook namespace cannot own snapshot connection",
+    "message": {
+      "type": "snapshot",
+      "sourceId": "hook:codex",
+      "sourceLabel": "fake",
+      "seq": 1,
+      "sessions": []
+    }
+  }
+]

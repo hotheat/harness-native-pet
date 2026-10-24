@@ -1,0 +1,145 @@
+{
+  "canvas" : {
+    "height" : 1024,
+    "width" : 1024
+  },
+  "coordinateSystem" : "top-left",
+  "poses" : {
+    "completed" : {
+      "anchor" : {
+        "x" : 0.5,
+        "y" : 0.97687400318979267
+      },
+      "file" : "completed.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1194,
+        "width" : 622,
+        "x" : 305,
+        "y" : 31
+      },
+      "width" : 1254
+    },
+    "drag" : {
+      "anchor" : {
+        "x" : 0.53628389154704947,
+        "y" : 0.97846889952153115
+      },
+      "file" : "drag.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1201,
+        "width" : 713,
+        "x" : 270,
+        "y" : 26
+      },
+      "width" : 1254
+    },
+    "error" : {
+      "anchor" : {
+        "x" : 0.49681020733652315,
+        "y" : 0.97208931419457734
+      },
+      "file" : "error.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1190,
+        "width" : 531,
+        "x" : 356,
+        "y" : 29
+      },
+      "width" : 1254
+    },
+    "idle" : {
+      "anchor" : {
+        "x" : 0.49840510366826157,
+        "y" : 0.9569377990430622
+      },
+      "file" : "idle.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1157,
+        "width" : 683,
+        "x" : 283,
+        "y" : 43
+      },
+      "width" : 1254
+    },
+    "poke" : {
+      "anchor" : {
+        "x" : 0.49601275917065391,
+        "y" : 0.96331738437001591
+      },
+      "file" : "poke.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1173,
+        "width" : 650,
+        "x" : 281,
+        "y" : 35
+      },
+      "width" : 1254
+    },
+    "sleeping" : {
+      "anchor" : {
+        "x" : 0.49960127591706538,
+        "y" : 0.96570972886762363
+      },
+      "file" : "sleeping.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1165,
+        "width" : 494,
+        "x" : 379,
+        "y" : 46
+      },
+      "width" : 1254
+    },
+    "thinking" : {
+      "anchor" : {
+        "x" : 0.51555023923444976,
+        "y" : 0.97527910685805419
+      },
+      "file" : "thinking.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1189,
+        "width" : 538,
+        "x" : 335,
+        "y" : 34
+      },
+      "width" : 1254
+    },
+    "waiting" : {
+      "anchor" : {
+        "x" : 0.49561403508771928,
+        "y" : 0.97049441786283897
+      },
+      "file" : "waiting.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1189,
+        "width" : 501,
+        "x" : 370,
+        "y" : 28
+      },
+      "width" : 1254
+    },
+    "working" : {
+      "anchor" : {
+        "x" : 0.49401913875598086,
+        "y" : 0.9569377990430622
+      },
+      "file" : "working.png",
+      "height" : 1254,
+      "visibleBounds" : {
+        "height" : 1153,
+        "width" : 617,
+        "x" : 315,
+        "y" : 47
+      },
+      "width" : 1254
+    }
+  },
+  "visibleBoundsAlphaThreshold" : 200
+}

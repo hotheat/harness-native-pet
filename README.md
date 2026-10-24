@@ -1,0 +1,71 @@
+# DSH Native Pet
+
+Native macOS desktop pet for DeepSeek Harness, built with Swift and AppKit.
+
+原生菜单栏桌宠，通过 DSH 插件及 Codex、Claude Code hooks 显示思考、工具执行、等待处理和回应结束状态。
+任务提醒同时支持桌宠文字与 macOS 系统通知。
+内置双丸子头小女孩与 [DSH Pet](https://github.com/PC2005-cloud/dsh-pet) 两套角色，支持拖动、点击互动、大小、动画和点击穿透设置。
+默认人物可见高度为 100 pt。
+
+## 本地运行
+
+本机验收平台为 Apple Silicon / macOS 15，构建需要 Xcode 命令行工具、Swift 6 和 Node.js 22 或更高版本。
+插件的宿主依赖以 [package.json](bridge/package.json) 为准。
+
+```sh
+npm --prefix bridge ci
+npm --prefix bridge run build
+bash scripts/package-app.sh
+open "dist/DSH Native Pet.app"
+```
+
+应用可独立启动，未接入插件时显示连接状态。
+点击菜单栏爪印图标，在「角色」中选择「小女孩」或「DSH Pet」即可立即切换。
+「设置与会话状态」中也可选择角色，选择会保存并在下次启动恢复。
+切换保留当前任务和脚底位置，窗口按角色动作范围调整，默认人物高度保持 100 pt。
+DSH Pet 使用 AVFoundation 播放原始透明 MOV；关闭动画后显示静态首帧。
+菜单还可显示或隐藏桌宠、切换大小、动画、点击穿透，以及查看会话状态。
+设置窗口主动打开时会获得焦点；桌宠普通点击和拖动使用非激活面板。
+
+## 接入 Codex / Claude Code
+
+安装附带的原生 hook helper，配置与使用步骤见 [宿主接入](docs/host-hooks.md)。
+
+## 接入 DSH
+
+先生成本地插件包：
+
+```sh
+(cd bridge && npm pack)
+```
+
+给指定 Web profile 安装 tarball，然后重启该 profile 的 DSH Host：
+
+```sh
+dsh plugin --profile web add "$PWD/bridge/dsh-native-pet-0.1.0.tgz"
+```
+
+应用与 DSH 必须运行在同一个 macOS 用户下。
+默认通过 `~/Library/Application Support/dsh-native-pet/pet.sock` 通信。
+自定义测试目录时，两端都设置相同的 `DSH_NATIVE_PET_RUNTIME_DIR`。
+
+官方 Desktop 使用自己的插件管理入口及配置。
+其安装和真实模型联动尚未验收，Web profile 的结果不能替代 Desktop 验收。
+插件只观察公开状态事件，审批操作仍在 DSH 中完成。
+
+## 构建产物
+
+打包脚本生成 `dist/DSH Native Pet.app`，使用本机 ad-hoc 签名。
+这是本地构建，尚未进行 Developer ID 签名或 Apple 公证。
+移动到其他目录后的资源检查：
+
+```sh
+bash scripts/smoke-package.sh
+```
+
+- [开发与检查](docs/development.md)
+- [状态链路与模块边界](docs/architecture.md)
+- [素材来源与布局](docs/assets.md)
+- [验收记录及未测项目](docs/acceptance.md)
+- [实施计划与执行证据](docs/plans/2026-10-23-native-desktop-pet.md)
+- [多宿主实施计划](docs/plans/2026-10-23-multi-host-notifications.md)

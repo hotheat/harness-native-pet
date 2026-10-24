@@ -1,0 +1,9 @@
+native/.build/
+native/.swiftpm/
+bridge/node_modules/
+bridge/lib/
+bridge/*.tgz
+dist/
+work/
+.DS_Store
+__pycache__/

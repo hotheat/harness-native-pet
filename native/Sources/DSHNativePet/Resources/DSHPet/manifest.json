@@ -1,0 +1,155 @@
+{
+  "canvas": {
+    "height": 360,
+    "width": 640
+  },
+  "coordinateSystem": "top-left",
+  "poses": {
+    "completed": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "completed.png",
+      "height": 360,
+      "video": "completed.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "drag": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "drag.png",
+      "height": 360,
+      "video": "drag.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "error": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "error.png",
+      "height": 360,
+      "video": "error.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "idle": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "idle.png",
+      "height": 360,
+      "video": "idle.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "poke": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "poke.png",
+      "height": 360,
+      "video": "poke.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "sleeping": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "sleeping.png",
+      "height": 360,
+      "video": "sleeping.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "thinking": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "thinking.png",
+      "height": 360,
+      "video": "thinking.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "waiting": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "waiting.png",
+      "height": 360,
+      "video": "waiting.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    },
+    "working": {
+      "anchor": {
+        "x": 0.4921875,
+        "y": 0.9138888888888889
+      },
+      "file": "working.png",
+      "height": 360,
+      "video": "working.mov",
+      "visibleBounds": {
+        "height": 324,
+        "width": 301,
+        "x": 161,
+        "y": 7
+      },
+      "width": 640
+    }
+  },
+  "visibleBoundsAlphaThreshold": 200,
+  "referenceHeight": 265
+}

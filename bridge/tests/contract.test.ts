@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { test } from 'node:test'
+import Ajv from 'ajv'
+import { decodeMessage, encodeMessage, MAX_LINE_BYTES } from '../src/protocol.js'
+import type { BridgeMessage } from '../src/protocol.js'
+
+interface Fixture { name: string; message: unknown }
+const read = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
+const validate = new Ajv.default({ strict: true }).compile(read('../../contracts/bridge.schema.json') as object)
+const valid = read('../../contracts/fixtures/snapshots.json') as Fixture[]
+const invalid = read('../../contracts/fixtures/invalid-messages.json') as Fixture[]
+
+for (const fixture of valid) {
+  test(`contract accepts shared ${fixture.name}`, () => {
+    assert.equal(validate(fixture.message), true, JSON.stringify(validate.errors))
+    const encoded = encodeMessage(decodeMessage(fixture.message))
+    assert.deepEqual(JSON.parse(encoded), fixture.message)
+    assert.equal(encoded.at(-1), '\n')
+  })
+}
+for (const fixture of invalid) {
+  test(`contract rejects shared ${fixture.name}`, () => {
+    assert.equal(validate(fixture.message), false)
+    assert.throws(() => decodeMessage(fixture.message))
+    assert.throws(() => encodeMessage(fixture.message as BridgeMessage))
+  })
+}
+test('encoded size uses UTF-8 bytes and limits only at IO', () => {
+  const message: BridgeMessage = { type: 'snapshot', sourceId: 'a', sourceLabel: '中'.repeat(MAX_LINE_BYTES / 2), seq: 1, sessions: [] }
+  assert.throws(() => encodeMessage(message), /exceeds/)
+  message.sourceLabel = 'DSH'
+  assert.doesNotThrow(() => encodeMessage(message))
+})

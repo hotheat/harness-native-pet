@@ -1,0 +1,96 @@
+{
+  "tool": "Codex built-in image_gen",
+  "date": "2026-10-23",
+  "transparent_background": true,
+  "notes": [
+    "One built-in call per independent pose.",
+    "Reference assets were inspected using view_image before editing.",
+    "Source files were not modified; no programmatic image editing was performed."
+  ],
+  "poses": {
+    "idle": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "front-full-body.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Pose: relaxed idle standing as in reference. Output only one independent pose.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-776b17e7-2786-4b3a-9479-ca54764f640b.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/idle.png"
+    },
+    "thinking": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "expressions/03-thinking.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Output only one independent pose. Keep hand at chin thinking pose; remove floating lightbulb so only girl remains. Keep feet on level baseline.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-4bcb6575-f0d1-4d7c-9112-9f268cf59306.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/thinking.png"
+    },
+    "working": {
+      "useCase": "identity-preserve",
+      "inputs": [
+        "front-full-body.png",
+        "three-view.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Output only one independent pose. Use case: identity-preserve. Generate the SAME girl in a modest focused working stance, both elbows gently bent, small hands held at belly height as though carefully performing a task, no tools or objects added. Small determined closed mouth, attentive eyes, head slightly leaning forward. BOTH feet planted level; full body and whole hair visible. Preserve exact face scale, twin buns, outfit and original childlike short proportions.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-8e2ce871-d1b9-40c6-8cb2-59b1b0c2affc.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/working.png"
+    },
+    "waiting": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "expressions/02-surprised.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Output only one independent pose. Keep gentle surprised hands-on-cheeks pose. Keep feet on level baseline.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-ca6d6ef9-2826-4b44-90fd-cccd65973d2b.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/waiting.png"
+    },
+    "completed": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "expressions/06-thumbs-up.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Output only one independent pose. Keep confident gentle thumbs-up pose. Keep feet on level baseline.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-95f95e36-f4a8-418f-a7f7-9f7d60534e0d.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/completed.png"
+    },
+    "error": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "expressions/04-pouting.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Pose: relaxed idle standing as in reference. Output only one independent pose. Preserve the gentle disappointed little pout, small hands held at chest. No punishment or additional icons.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-28072cc6-f168-48a4-81ac-38e943647fa4.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/error.png"
+    },
+    "sleeping": {
+      "useCase": "identity-preserve",
+      "inputs": [
+        "expressions/07-sleepy-yawn.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Pose: relaxed idle standing as in reference. Output only one independent pose. Change expression to peacefully closed eyes, small relaxed mouth; both hands rest relaxed at sides, standing balanced with both bare feet on shared baseline. Remove all floating moons and stars. Same girl and clothing.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-6828fd29-c461-4bb6-89bc-c1871e6cc95b.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/sleeping.png"
+    },
+    "poke": {
+      "useCase": "background-extraction",
+      "inputs": [
+        "expressions/01-happy-wave.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Pose: relaxed idle standing as in reference. Output only one independent pose. Preserve happy smile and raised waving hand. No additional icons.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-3ea0ce00-66f2-4616-8e4f-afa29476ef5d.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/poke.png"
+    },
+    "drag": {
+      "useCase": "identity-preserve",
+      "inputs": [
+        "front-full-body.png",
+        "three-view.png"
+      ],
+      "prompt": "Use case: background-extraction. Asset type: native macOS desktop pet transparent PNG sprite. Edit the attached image to remove its cream paper background completely, preserving the same character identity, delicate brown line art, warm watercolor illustration, all clothing and details. Make a single full-body cutout, head through bare toes intact, centered on a square transparent canvas, with similar generous padding on all sides. Feet resting near 90% canvas height. Keep black twin buns, pale pink ties, white T-shirt, pale shoulder strap and buckles, green pocket containing yellow lion face and leaf motif, beige floral capri pants, bare feet. No floor shadow, no ground, no checkerboard painted in image, no text or watermark. Keep character color opaque, including white clothing. Output only one independent pose. Use case: identity-preserve. Generate the SAME girl making a gentle being-moved reaction: arms spread a little outward for balance, head slightly tilted, eyebrows lifted, small surprised o mouth, both legs together with feet gently angled. No gripping cursor or hand, no rope, no external object, no stretched anatomy, no extra limbs. Whole body intact, not cropped. Preserve original short childlike proportions and every clothing identity anchor.",
+      "generatedCachePath": "/Users/jiaoguo/.codex/generated_images/01a16857-24e1-79e2-9866-b7d0d2982c6f/exec-c2f81fed-245d-45c2-8ec6-9b960a05d554.png",
+      "output": "../../native/Sources/DSHNativePet/Resources/Character/drag.png"
+    }
+  },
+  "referenceRoot": "references"
+}

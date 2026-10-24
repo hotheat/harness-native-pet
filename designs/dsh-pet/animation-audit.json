@@ -1,0 +1,271 @@
+{
+  "alphaThreshold": 200,
+  "decoder": "AVFoundation AVAssetReader, 32BGRA",
+  "poses": {
+    "completed": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 643,
+      "posterBounds": {
+        "height": 265,
+        "width": 209,
+        "x": 215,
+        "y": 64
+      },
+      "posterBytes": 114742,
+      "posterSha256": "53ef1b721b6107ae1c6252621517b4e399ec6b6705119d3ea125c83f798a2659",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 311,
+        "width": 285,
+        "x": 177,
+        "y": 19
+      },
+      "videoBytes": 752297,
+      "videoSha256": "f3b2424f6d557290cef7303c82e57f463322c3569729122ae26a9531a87de245",
+      "width": 640
+    },
+    "drag": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 693,
+      "posterBounds": {
+        "height": 264,
+        "width": 208,
+        "x": 217,
+        "y": 66
+      },
+      "posterBytes": 114000,
+      "posterSha256": "73a7a96ba496bd383c7e204cacd5af8c817b835b8d93509a42af8136b409f6b8",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 303,
+        "width": 245,
+        "x": 205,
+        "y": 27
+      },
+      "videoBytes": 704121,
+      "videoSha256": "d6e9a7f0842f186ba0e577c330c57a121b86c4db5216d0834bb9a4aadfcaf405",
+      "width": 640
+    },
+    "error": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 4.916666666666667,
+      "frameCount": 118,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 845,
+      "posterBounds": {
+        "height": 265,
+        "width": 207,
+        "x": 218,
+        "y": 64
+      },
+      "posterBytes": 114136,
+      "posterSha256": "e73bcc127eca3a3bb70c0969e45a38b10b77eaff149b6baefabe6e2b12d6d030",
+      "uniqueSampledFrameHashes": 4,
+      "videoBounds": {
+        "height": 280,
+        "width": 265,
+        "x": 161,
+        "y": 49
+      },
+      "videoBytes": 294187,
+      "videoSha256": "34517630a5ed909f2a5f66eea3d185a2c3e66e2d061c59b1991acf76ee955756",
+      "width": 640
+    },
+    "idle": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 720,
+      "posterBounds": {
+        "height": 265,
+        "width": 211,
+        "x": 214,
+        "y": 64
+      },
+      "posterBytes": 114320,
+      "posterSha256": "d1b26423279a347cef3fb506da23a7e4cf31921b2a6d9ef5d1ddb9025965b921",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 270,
+        "width": 238,
+        "x": 197,
+        "y": 60
+      },
+      "videoBytes": 658964,
+      "videoSha256": "f7202e0b6ff72e482d7cb92d5f50274858014b2facecc71eb3e2c5d680bc8efa",
+      "width": 640
+    },
+    "poke": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 738,
+      "posterBounds": {
+        "height": 265,
+        "width": 210,
+        "x": 214,
+        "y": 64
+      },
+      "posterBytes": 114074,
+      "posterSha256": "af4e301e6f952b53561f8963a72a5550ac35be7cef23bfa6257134de7d13209a",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 293,
+        "width": 222,
+        "x": 208,
+        "y": 37
+      },
+      "videoBytes": 670054,
+      "videoSha256": "cccdf7aa36eec498b89a03f537b3c780f15365cf639951abda52077b18b7413d",
+      "width": 640
+    },
+    "sleeping": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 708,
+      "posterBounds": {
+        "height": 261,
+        "width": 210,
+        "x": 216,
+        "y": 65
+      },
+      "posterBytes": 114019,
+      "posterSha256": "2d01b629478f6373d7c734de2b81c7efb7093d38869496bb00f6178ebcd32e6f",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 297,
+        "width": 222,
+        "x": 207,
+        "y": 30
+      },
+      "videoBytes": 649383,
+      "videoSha256": "e9c8090e1d74f0f1144b5072d3d15c387d0e5d0b3f266fd5ff8f2989106b7a57",
+      "width": 640
+    },
+    "thinking": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 738,
+      "posterBounds": {
+        "height": 264,
+        "width": 208,
+        "x": 216,
+        "y": 65
+      },
+      "posterBytes": 115435,
+      "posterSha256": "72940fdf096df50f35a56b6b7d3bb6ad595da14172973ac486acea1e12eb8cdb",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 275,
+        "width": 247,
+        "x": 186,
+        "y": 55
+      },
+      "videoBytes": 659282,
+      "videoSha256": "9d0f22cbb3673e9243c1fe03bfe447b433e58f4ffb9b499aecfe5a0b85216aa5",
+      "width": 640
+    },
+    "waiting": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 682,
+      "posterBounds": {
+        "height": 265,
+        "width": 205,
+        "x": 217,
+        "y": 65
+      },
+      "posterBytes": 112292,
+      "posterSha256": "a85f16d613be56579d8924370fc086c1a7863134a22043e7478785860325736a",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 289,
+        "width": 252,
+        "x": 186,
+        "y": 42
+      },
+      "videoBytes": 724135,
+      "videoSha256": "b2f167962bcdb2aba13785455a9b87e831fb9126d215a16ae68972f6ac947096",
+      "width": 640
+    },
+    "working": {
+      "alphaRange": [
+        0,
+        255
+      ],
+      "durationSeconds": 10.041666666666666,
+      "frameCount": 241,
+      "height": 360,
+      "minimumFullyTransparentPixelsPerFrame": 796,
+      "posterBounds": {
+        "height": 265,
+        "width": 201,
+        "x": 219,
+        "y": 65
+      },
+      "posterBytes": 112450,
+      "posterSha256": "d4af12860e2bfa33d66560deca3eefa0564cd7db4de219085e8d92237f980936",
+      "uniqueSampledFrameHashes": 9,
+      "videoBounds": {
+        "height": 323,
+        "width": 264,
+        "x": 180,
+        "y": 7
+      },
+      "videoBytes": 736653,
+      "videoSha256": "1c439ab025ff31b67b6c6d2b72223d5281a3c5c27762fbf1f7d92342762b8187",
+      "width": 640
+    }
+  },
+  "scan": "every decoded video frame",
+  "sharedAnchor": {
+    "x": 0.4921875,
+    "y": 0.9138888888888889
+  },
+  "sharedVisibleBounds": {
+    "height": 324,
+    "width": 301,
+    "x": 161,
+    "y": 7
+  },
+  "referenceHeight": 265,
+  "referenceHeightBasis": "idle first decoded frame visible bounds height at alpha > 200"
+}
