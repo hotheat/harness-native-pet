@@ -31,6 +31,7 @@ public final class PetStore {
         var tools: Set<String> = []
         var finishedTools: Set<String> = []
         var terminal = false
+        var stopOccurredAt: Double?
         var closed = false
         var waitingAt: Date?
         var waitingNotified = false
@@ -43,8 +44,7 @@ public final class PetStore {
     private var notices: [PetNotice] = []
     private var eventIDs: Set<String> = []
     private var eventOrder: [String] = []
-    private var snapshotWaiting: [SessionKey: Date] = [:]
-    private var snapshotWaitingNotified: Set<SessionKey> = []
+    private var snapshotWaiting: Set<SessionKey> = []
 
     public init() {}
 
@@ -61,19 +61,17 @@ public final class PetStore {
         }) { feedback = nil }
 
         let liveIDs = Set(snapshot.sessions.map(\.sessionId))
-        snapshotWaiting = snapshotWaiting.filter { $0.key.source != snapshot.sourceId || liveIDs.contains($0.key.session) }
-        snapshotWaitingNotified = snapshotWaitingNotified.filter { $0.source != snapshot.sourceId || liveIDs.contains($0.session) }
+        snapshotWaiting = snapshotWaiting.filter { $0.source != snapshot.sourceId || liveIDs.contains($0.session) }
         for session in snapshot.sessions {
             let key = SessionKey(source: snapshot.sourceId, session: session.sessionId)
             if session.phase == .waiting {
-                if snapshotWaiting[key] == nil {
-                    snapshotWaiting[key] = at
-                    // A reconnect baseline reports state but does not replay old prompts.
-                    if previous == nil { snapshotWaitingNotified.insert(key) }
+                if snapshotWaiting.insert(key).inserted, previous != nil {
+                    recordNotice(id: "\(key.source):\(key.session):waiting:\(snapshot.seq)", source: key.source,
+                                 label: snapshot.sourceLabel, session: key.session, kind: .waiting,
+                                 body: "有待处理请求，请查看 \(snapshot.sourceLabel)")
                 }
             } else {
-                snapshotWaiting.removeValue(forKey: key)
-                snapshotWaitingNotified.remove(key)
+                snapshotWaiting.remove(key)
             }
             guard let result = session.result else { continue }
             if previous != nil, !(resultIDs[session.sessionId] ?? []).contains(result.id) {
@@ -113,7 +111,8 @@ public final class PetStore {
                                              turnID: event.turnId, turnStartedAt: event.occurredAt,
                                              latestOccurredAt: event.occurredAt, phaseOccurredAt: event.occurredAt, lastReceivedAt: at)
         if let turnID = event.turnId, turnID != state.turnID {
-            guard !state.retiredTurns.contains(turnID), event.occurredAt >= state.latestOccurredAt else { return }
+            guard state.turnID == nil || event.kind == .turnStarted else { return }
+            guard !state.retiredTurns.contains(turnID), state.turnID == nil || event.occurredAt >= state.latestOccurredAt else { return }
             if let old = state.turnID { state.retiredTurns.append(old) }
             if state.retiredTurns.count > 32 { state.retiredTurns.removeFirst() }
             state.turnID = turnID
@@ -123,6 +122,7 @@ public final class PetStore {
             state.tools = []
             state.finishedTools = []
             state.terminal = false
+            state.stopOccurredAt = nil
             state.closed = false
             state.waitingAt = nil
             state.waitingNotified = false
@@ -140,8 +140,20 @@ public final class PetStore {
             hooks[key] = state
             return
         }
-        // A terminal turn cannot be revived by delayed running/tool facts.
-        if state.terminal { hooks[key] = state; return }
+        let isTerminal = event.kind == .turnEnded || event.kind == .interrupted || (event.kind == .failed && event.toolId == nil)
+        if state.terminal, !isTerminal {
+            let isActivity = [.turnStarted, .running, .toolStarted, .toolFinished, .waiting, .failed].contains(event.kind)
+            guard !state.closed, isActivity, let stopAt = state.stopOccurredAt,
+                  event.occurredAt >= stopAt, event.occurredAt >= state.phaseOccurredAt else {
+                hooks[key] = state
+                return
+            }
+            state.terminal = false
+            state.stopOccurredAt = nil
+            state.result = nil
+            if feedback?.sourceID == event.sourceId && feedback?.sessionID == event.sessionId { feedback = nil }
+        }
+        let shouldNotify = !state.terminal
         switch event.kind {
         case .sessionStarted:
             break
@@ -184,6 +196,12 @@ public final class PetStore {
                 state.waitingNotified = false
                 break
             }
+            state.phaseOccurredAt = max(state.phaseOccurredAt, event.occurredAt)
+            if event.kind == .turnEnded, !state.terminal || state.stopOccurredAt != nil {
+                state.stopOccurredAt = max(state.stopOccurredAt ?? event.occurredAt, event.occurredAt)
+            } else {
+                state.stopOccurredAt = nil
+            }
             state.terminal = true
             state.tools = []
             state.waitingAt = nil
@@ -199,11 +217,13 @@ public final class PetStore {
                 (state.phase, kind, pose, body) = (.completed, .ended, .completed, "本轮回应已结束")
             }
             state.result = SessionResult(id: event.eventId, outcome: event.kind == .failed ? "error" : event.kind == .interrupted ? "aborted" : "other")
-            // An explicit live Stop is meaningful even when it is the first event.
-            recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
-                         session: event.sessionId, kind: kind, body: body)
-            showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
-                         text: "\(event.provider.title)：\(body)", at: at)
+            // A Stop can notify again only after observed same-turn activity.
+            if shouldNotify {
+                recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
+                             session: event.sessionId, kind: kind, body: body)
+                showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
+                             text: "\(event.provider.title)：\(body)", at: at)
+            }
         case .sessionEnded:
             break
         }
@@ -219,8 +239,7 @@ public final class PetStore {
 
     public func disconnect(sourceID: String, at: Date = Date()) {
         sources.removeValue(forKey: sourceID)
-        snapshotWaiting = snapshotWaiting.filter { $0.key.source != sourceID }
-        snapshotWaitingNotified = snapshotWaitingNotified.filter { $0.source != sourceID }
+        snapshotWaiting = snapshotWaiting.filter { $0.source != sourceID }
         if feedback?.sourceID == sourceID { feedback = nil }
         // Disconnect never revokes an already queued notice.
     }
@@ -237,12 +256,6 @@ public final class PetStore {
                          label: state.provider.title, session: key.session, kind: .waiting,
                          body: "有待处理请求，请查看 \(state.provider.title)")
         }
-        for (key, waitingAt) in snapshotWaiting where !snapshotWaitingNotified.contains(key) && at.timeIntervalSince(waitingAt) >= 0.3 {
-            snapshotWaitingNotified.insert(key)
-            recordNotice(id: "\(key.source):\(key.session):waiting:\(waitingAt.timeIntervalSince1970)", source: key.source,
-                         label: sources[key.source]?.snapshot.sourceLabel ?? "DSH", session: key.session,
-                         kind: .waiting, body: "有待处理请求，请查看 \(sources[key.source]?.snapshot.sourceLabel ?? "DSH")")
-        }
         let result = notices
         notices = []
         return result
@@ -251,7 +264,6 @@ public final class PetStore {
     private func recordNotice(id: String, source: String, label: String, session: String, kind: PetNoticeKind, body: String) {
         notices.append(PetNotice(id: id, sourceId: source, sourceLabel: label, sessionId: session,
                                  kind: kind, title: "\(label) 会话提醒", body: body))
-        if notices.count > 256 { notices.removeFirst(notices.count - 256) }
     }
 
     private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, text: String, at: Date) {
@@ -281,9 +293,12 @@ public final class PetStore {
                 PresentedSession(sourceId: key, sourceLabel: source.sourceLabel, session: $0)
             }
         }
-        sessions += hooks.keys.filter { hooks[$0]?.closed == false }.sorted { ($0.source, $0.session) < ($1.source, $1.session) }.map { key in
+        sessions += hooks.keys.filter { key in
             let state = hooks[key]!
-            let stale = at.timeIntervalSince(state.lastReceivedAt) >= 900
+            return !state.closed && (!state.terminal || at.timeIntervalSince(state.lastReceivedAt) < 900)
+        }.sorted { ($0.source, $0.session) < ($1.source, $1.session) }.map { key in
+            let state = hooks[key]!
+            let stale = !state.terminal && at.timeIntervalSince(state.lastReceivedAt) >= 900
             let pending = state.waitingAt.map { at.timeIntervalSince($0) >= 0.3 } ?? false
             let phase: SessionPhase = stale ? .idle : state.phase == .waiting && !pending ? .thinking : state.phase
             return PresentedSession(sourceId: key.source, sourceLabel: state.provider.title,
@@ -314,6 +329,6 @@ public final class PetStore {
             text = sessions.contains(where: \.isStale) ? "状态待确认" : sources.isEmpty && sessions.isEmpty ? "未连接宿主" : "准备就绪"
         }
         return PetPresentation(pose: pose, text: text, activeCount: activeCount,
-                               waitingCount: waitingCount, connectedSources: sources.count + Set(hooks.filter { !$0.value.closed }.keys.map(\.source)).count, sessions: sessions)
+                               waitingCount: waitingCount, connectedSources: sources.count + Set(sessions.filter { $0.sourceId.hasPrefix("hook:") }.map(\.sourceId)).count, sessions: sessions)
     }
 }

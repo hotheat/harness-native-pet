@@ -142,4 +142,30 @@ struct PetStoreTests {
         #expect(!value.text.contains("仍在执行"))
     }
 
+    @Test func snapshotWaitingNotifiesImmediatelyOncePerContinuousEpisode() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .waiting)]), at: now)
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).isEmpty)
+        store.apply(snapshot([session(phase: .working)], seq: 2), at: now)
+        store.apply(snapshot([session(phase: .waiting)], seq: 3), at: now)
+        #expect(store.drainNotices(at: now).map(\.kind) == [.waiting])
+        store.apply(snapshot([session(phase: .waiting)], seq: 4), at: now.addingTimeInterval(1))
+        #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
+        store.apply(snapshot([], seq: 5), at: now.addingTimeInterval(3))
+        store.apply(snapshot([session(phase: .waiting)], seq: 6), at: now.addingTimeInterval(4))
+        #expect(store.drainNotices(at: now.addingTimeInterval(4)).map(\.kind) == [.waiting])
+        store.disconnect(sourceID: "a", at: now)
+        store.apply(snapshot([session(phase: .waiting)]), at: now)
+        #expect(store.drainNotices(at: now.addingTimeInterval(1)).isEmpty)
+    }
+
+    @Test func allThreeHundredNoticesRetainTheirOrder() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking)]), at: now)
+        for index in 1...300 {
+            store.apply(snapshot([session(phase: .completed, result: SessionResult(id: "r-\(index)", outcome: "completed"))], seq: index + 1), at: now)
+        }
+        #expect(store.drainNotices(at: now).map(\.id) == (1...300).map { "a:s:r-\($0)" })
+    }
+
 }
