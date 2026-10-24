@@ -55,6 +55,9 @@ Socket 绑定、GUI 会话或 AVFoundation 解码失败应分别记录为未验�
 自动检查定义见 [check.yml](../.github/workflows/check.yml)。
 远端 CI 是否通过以实际运行结果为准。
 
+[发布工作流](../.github/workflows/release.yml) 在推送到 `main` 或手动触发时更新滚动发布 `latest`，推送 `v*` 标签时发布对应版本。
+工作流依次执行 `package-app.sh`、`package-dmg.sh` 和 `ditto`，将 DMG 与应用 ZIP 上传到 GitHub Releases，并保留 `dist/` 构建产物。
+
 
 同进程角色切换验收：
 
