@@ -10,8 +10,9 @@ permissions:
   contents: write
 
 concurrency:
+  # Build releases share latest; version tags each have their own group.
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
 
 jobs:
   macos:
@@ -37,20 +38,26 @@ jobs:
           notes="macOS arm64 build from ${GITHUB_SHA}. Ad-hoc signed; not notarised."
           if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == refs/tags/v* ]]; then
             tag="$GITHUB_REF_NAME"
+            title="DSH Native Pet $tag"
             if gh release view "$tag" > /dev/null 2>&1; then
-              gh release edit "$tag" --title "DSH Native Pet $tag" --latest=false
+              gh release edit "$tag" --title "$title" --notes "$notes" --latest
             else
-              gh release create "$tag" --title "DSH Native Pet $tag" \
-                --notes "$notes" --verify-tag --latest=false
+              gh release create "$tag" --title "$title" \
+                --notes "$notes" --verify-tag --latest
             fi
             gh release upload "$tag" "${assets[@]}" --clobber
           else
-            if ! gh release view latest > /dev/null 2>&1; then
-              gh release create latest --title "Latest build" \
-                --notes "$notes" --target "$GITHUB_SHA" --latest
-            fi
-            gh release upload latest "${assets[@]}" --clobber
-            gh release edit latest --title "Latest build" --notes "$notes" --latest
+            timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            tag="build-${timestamp}"
+            title="Build ${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2} ${timestamp:9:2}:${timestamp:11:2} UTC"
+            gh release create "$tag" "${assets[@]}" --title "$title" \
+              --notes "$notes" --target "$GITHUB_SHA" --latest
+
+            gh api --paginate --slurp "repos/${GH_REPO}/releases?per_page=100" \
+              --jq 'add | map(select(.tag_name | startswith("build-"))) | sort_by(.created_at) | reverse | .[10:][] | .tag_name' |
+              while IFS= read -r old_tag; do
+                gh release delete "$old_tag" --yes --cleanup-tag
+              done
           fi
       - uses: actions/upload-artifact@v4
         if: always()
