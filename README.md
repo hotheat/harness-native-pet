@@ -59,7 +59,8 @@ dsh plugin --profile web add "$PWD/bridge/dsh-native-pet-0.1.0.tgz"
 
 ## 构建产物
 
-每次推送到 `main` 都会更新滚动发布 `latest`，推送 `v*` 标签会发布对应版本。
+每次推送到 `main` 都会新建 `build-<timestamp>` 发布并标记为 latest，推送 `v*` 标签会发布对应版本并标记为 latest。
+构建发布只保留最近 10 个，版本发布不受此清理规则影响。
 最新 macOS arm64 构建可通过固定链接下载：
 
 - [DMG 安装包](https://github.com/hotheat/harness-native-pet/releases/latest/download/dsh-native-pet-macos-arm64.dmg)
