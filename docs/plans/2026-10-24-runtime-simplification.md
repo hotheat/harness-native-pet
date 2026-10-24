@@ -384,3 +384,8 @@ python3 scripts/test-real-host-hooks.py --app 'dist/DSH Native Pet.app' --output
 - [ ] AppDelegate 与 capture 分离，证据只含消费字段，外部测试承接换肤断言，release E2E 通过。
 - [ ] 未增加新 module/通用框架，未删除必要安全边界和有效测试。
 - [ ] 标准构建、单测、集成、打包及本机可执行的 E2E 全部通过，未测项如实记录。
+
+## Execution Evidence
+
+实现由 Codex 在 worktree 中完成；Codex 沙箱禁止创建 socket 和写入 git 元数据，因此真实 socket、GUI 相关验收和最终回归由主会话在本机重跑，结果见 [验收记录](../acceptance.md)。
+主会话审查时补充修正：Stop 结束后同回合收到 StopFailure 或 Interrupt 时，原实现会吞掉错误/中断提醒，已改为升级终态并提醒一次。
