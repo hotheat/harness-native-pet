@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let automated: Bool
     let preferences: PetPreferences
     let status = PetStatusModel()
+    let hostConnections = HostConnectionModel()
     var panel: PetPanel?
     var petView: PetView?
     private var animator: PetAnimator?
@@ -206,6 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let events = PetEventDispatcher(store: store,
             onUpdate: { [weak self] event in
                 guard let self else { return }
+                if case .message(.activity(let activity)) = event {
+                    self.hostConnections.noteActivity(provider: activity.provider)
+                }
                 self.refresh()
                 let stateEvent: Bool
                 switch event {
@@ -326,7 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "DSH 桌宠设置"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: SettingsView(preferences: preferences, status: status))
+            window.contentView = NSHostingView(rootView: SettingsView(preferences: preferences, status: status, hostConnections: hostConnections))
             window.center()
             settingsWindow = window
         }

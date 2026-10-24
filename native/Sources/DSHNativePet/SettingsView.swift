@@ -52,6 +52,7 @@ final class PetStatusModel: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var preferences: PetPreferences
     @ObservedObject var status: PetStatusModel
+    @ObservedObject var hostConnections: HostConnectionModel
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -97,8 +98,7 @@ struct SettingsView: View {
                 if let warning = status.protocolWarning {
                     Text(warning).foregroundStyle(.orange).textSelection(.enabled)
                 }
-                Text("Codex 和 Claude Code 通过附带的 pet-hook 接入，需安装并配置宿主 hooks。")
-                    .font(.caption).foregroundStyle(.secondary)
+                HostConnectionView(model: hostConnections)
                 Text(status.socketPath).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
             }
             Section("会话状态") {
