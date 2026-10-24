@@ -74,7 +74,7 @@ extension AppDelegate {
             "sessionIDs": presentation.sessions.map(\.sessionId),
             "sourceLabels": status.sourceLabels,
             "storePose": presentation.pose.rawValue,
-            "displayText": view.subviews.compactMap { $0 as? NSTextField }.first?.stringValue ?? "",
+            "displayText": view.displayText,
         ]
         try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
             .write(to: url.deletingPathExtension().appendingPathExtension("json"))
