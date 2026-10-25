@@ -497,7 +497,7 @@ System adapter 只复制投影内容到 UserNotifications；Recording adapter �
 | maxTokens | 达到输出上限 |
 | other | 本轮已结束 |
 
-通知标题保持“来源标签 会话提醒”，通知不包含会话标题。
+通知标题默认保持“来源标签 会话提醒”；开启「在通知中显示会话标题」后改为“来源标签 · 标题”，正文、声音与点击行为不变。
 普通无标题气泡反馈统一使用“来源标签：反馈正文”；有来源的并行完成使用“来源标签\n本轮结束 · N 执行中/思考中”，有标题时使用标题替代来源。
 设置 completed 行文案统一为“本轮回应已结束”；其余 phase、等待、睡眠、无宿主、状态待确认与连接异常文案保留。
 
@@ -609,7 +609,7 @@ Codex 的沙箱内 socket/菜单/视频失败没有在本机复现；以下为�
 
 | 检查 | 结果 |
 | --- | --- |
-| `swift test --package-path native --disable-sandbox` | **166 项全部通过**（含 Unix socket、菜单、视频解码、气泡矩阵、projector、pose） |
+| `swift test --package-path native --disable-sandbox` | **169 项全部通过**（含 Unix socket、菜单、视频解码、气泡矩阵、projector、pose、通知标题开关） |
 | `swift build --product DSHNativePet` | 通过 |
 | `npm --prefix bridge test` | 35 项通过 |
 | `npm --prefix bridge run test:e2e` | 116 项通过（含真实 DSH Host） |
