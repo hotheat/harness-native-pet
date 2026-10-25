@@ -4,12 +4,12 @@ import AppKit
 final class StatusMenu: NSObject {
     private let statusItem: NSStatusItem
     private let preferences: PetPreferences
-    private let summary = NSMenuItem(title: "暂无宿主状态", action: nil, keyEquivalent: "")
-    private let sourceItem = NSMenuItem(title: "来源：无", action: nil, keyEquivalent: "")
+    private let summary = NSMenuItem(title: PetMessageProjector.emptySummary, action: nil, keyEquivalent: "")
+    private let sourceItem = NSMenuItem(title: PetMessageProjector.sourceSummary([]), action: nil, keyEquivalent: "")
     private let notificationStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let notificationItem = NSMenuItem(title: "系统通知", action: #selector(toggleNotifications), keyEquivalent: "")
     private let notificationSettingsItem = NSMenuItem(title: "打开系统通知设置…", action: #selector(notificationSettings), keyEquivalent: "")
-    private(set) var sourceSummary = "来源：无"
+    private(set) var sourceSummary = PetMessageProjector.sourceSummary([])
     private let protocolItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let errorItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let visibleItem = NSMenuItem(title: "显示桌宠", action: #selector(toggleVisible), keyEquivalent: "")
@@ -69,18 +69,18 @@ final class StatusMenu: NSObject {
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
-        update(summary: "暂无宿主状态", error: nil)
+        update(summary: PetMessageProjector.emptySummary, error: nil)
     }
 
     func update(summary text: String, error: String?, sourceLabels: [String] = [],
                 authorization: PetNotificationAuthorization = .notDetermined, protocolWarning: String? = nil) {
-        sourceSummary = "来源：" + (sourceLabels.isEmpty ? "无" : sourceLabels.joined(separator: "、"))
+        sourceSummary = PetMessageProjector.sourceSummary(sourceLabels)
         sourceItem.title = sourceSummary
-        notificationStatusItem.title = "通知权限：\(authorization.title)"
+        notificationStatusItem.title = PetMessageProjector.notificationStatus(authorization)
         notificationSettingsItem.isHidden = authorization != .denied
         notificationItem.state = preferences.systemNotifications ? .on : .off
         summary.title = text
-        errorItem.title = error.map { "连接错误：\($0)" } ?? ""
+        errorItem.title = PetMessageProjector.connectionError(error)
         errorItem.isHidden = error == nil
         protocolItem.title = protocolWarning ?? ""
         protocolItem.isHidden = protocolWarning == nil

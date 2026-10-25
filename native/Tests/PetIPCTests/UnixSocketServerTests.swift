@@ -168,7 +168,7 @@ struct UnixSocketServerTests {
         server.stop()
         #expect(recorder.events == ["ready", "activity", "activity"])
         #expect(store.presentation().sessions.count == 1)
-        #expect(store.presentation().sessions.first?.phase == .completed)
+        #expect(store.presentation().sessions.first?.session.phase == .completed)
         #expect(store.drainNotices().map(\.kind) == [.ended])
     }
 

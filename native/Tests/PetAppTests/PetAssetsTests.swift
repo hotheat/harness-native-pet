@@ -82,7 +82,12 @@ struct PetAssetsTests {
         _ = NSApplication.shared
         let view = PetView(assets: try PetAssets())
         view.frame = NSRect(origin: .zero, size: PetPreferences.Size.medium.panelSize)
-        try view.render(pose: .waiting, text: "1 个会话待处理，请查看 DSH")
+        let store = PetStore()
+        store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 1, sessions: [
+            SessionSnapshot(sessionId: "s", turn: 1, phase: .waiting, activeTools: 0, pendingApprovals: 1, result: nil),
+        ]))
+        let state = store.presentation()
+        try view.render(pose: .waiting, text: PetMessageProjector.bubble(state, pose: .waiting, bubbleWidth: view.bounds.width - 14))
         view.layoutSubtreeIfNeeded()
         #expect(view.displayText == "1 个会话待处理，请查看 DSH")
         let twoLineFrame = view.bubbleFrame
@@ -98,7 +103,7 @@ struct PetAssetsTests {
         view.layoutSubtreeIfNeeded()
         #expect(view.bubbleFrame.height == twoLineFrame.height)
         view.frame.size.width = 220
-        try view.render(pose: .waiting, text: "1 个会话待处理，请查看 DSH")
+        try view.render(pose: .waiting, text: PetMessageProjector.bubble(state, pose: .waiting, bubbleWidth: view.bounds.width - 14))
         view.layoutSubtreeIfNeeded()
         #expect(view.bubbleFrame.width == 206)
         #expect(view.bubbleFrame.height < twoLineFrame.height)

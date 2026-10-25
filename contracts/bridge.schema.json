@@ -112,6 +112,18 @@
                     "type": "null"
                   }
                 ]
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Title/label text: remove Unicode Cc/Cf, trim whitespace, truncate to 256 Unicode scalar values; empty becomes null. maxLength is the producer output limit; decoders normalize and truncate longer strings."
               }
             }
           }
@@ -216,6 +228,18 @@
         "v": {
           "type": "integer",
           "const": 1
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Title/label text: remove Unicode Cc/Cf, trim whitespace, truncate to 256 Unicode scalar values; empty becomes null. maxLength is the producer output limit; decoders normalize and truncate longer strings."
         }
       }
     }

@@ -2,53 +2,6 @@ import AppKit
 import SwiftUI
 import PetCore
 
-@MainActor
-final class PetStatusModel: ObservableObject {
-    @Published var summary = "暂无宿主状态"
-    @Published var sessionRows: [SessionRow] = []
-    @Published var focusedSessionID: String?
-    @Published var connectionError: String?
-    @Published var protocolWarning: String?
-    @Published var notificationAuthorization: PetNotificationAuthorization = .notDetermined
-    @Published var notificationError: String?
-    @Published var sourceLabels: [String] = []
-    var socketPath = ""
-
-    struct SessionRow: Identifiable {
-        let id: String
-        let title: String
-        let detail: String
-    }
-
-    func update(_ state: PetPresentation) {
-        sourceLabels = Array(Set(state.sessions.map(\.sourceLabel))).sorted()
-        let hosts = sourceLabels.isEmpty ? "宿主" : sourceLabels.joined(separator: "、")
-        summary = state.connectedSources == 0 ? "暂无宿主状态" : "\(hosts) · 来源 \(state.connectedSources) · 活动 \(state.activeCount) · 等待 \(state.waitingCount)"
-        sessionRows = state.sessions.map { session in
-            SessionRow(id: Self.rowID(sourceId: session.sourceId, sessionId: session.sessionId),
-                       title: "\(session.sourceLabel) · \(session.sessionId.prefix(30))",
-                       detail: session.isStale ? "状态待确认" : "\(Self.phaseTitle(session.phase)) · 工具 \(session.activeTools) · 待决定 \(session.pendingApprovals)")
-        }
-    }
-
-    static func rowID(sourceId: String, sessionId: String) -> String {
-        "\(sourceId.utf8.count):\(sourceId)\(sessionId)"
-    }
-
-    static func phaseTitle(_ phase: SessionPhase) -> String {
-        switch phase {
-        case .idle: "空闲"
-        case .running: "执行中"
-        case .thinking: "思考中"
-        case .working: "处理工具"
-        case .waiting: "等待决定，请在宿主查看"
-        case .completed: "本轮回应结束"
-        case .error: "执行失败"
-        case .stopped: "已停止"
-        }
-    }
-}
-
 struct SettingsView: View {
     @ObservedObject var preferences: PetPreferences
     @ObservedObject var status: PetStatusModel
@@ -82,6 +35,8 @@ struct SettingsView: View {
             }
             Section("通知") {
                 Toggle("系统通知", isOn: $preferences.systemNotifications)
+                Toggle("在通知中显示会话标题", isOn: $preferences.notificationSessionTitle)
+                Text("标题可能由提示词生成，默认关闭。").font(.caption).foregroundStyle(.secondary)
                 Text(status.notificationAuthorization.title).font(.caption).foregroundStyle(.secondary)
                 if status.notificationAuthorization == .denied {
                     Button("打开系统通知设置…") { PetNotificationAuthorization.openSettings() }

@@ -71,7 +71,7 @@ extension AppDelegate {
             "footScreenY": panel.frame.minY + 8,
             "frame": NSStringFromRect(panel.frame),
             "connectedSources": presentation.connectedSources,
-            "sessionIDs": presentation.sessions.map(\.sessionId),
+            "sessionIDs": presentation.sessions.map(\.session.sessionId),
             "sourceLabels": status.sourceLabels,
             "storePose": presentation.pose.rawValue,
             "displayText": view.displayText,

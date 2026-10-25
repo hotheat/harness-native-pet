@@ -50,7 +50,10 @@ public enum BridgeMessage: Sendable {
             guard event.occurredAt.isFinite, event.occurredAt >= 0 else {
                 throw BridgeMessageError.invalid("invalid occurredAt")
             }
-            return .activity(event)
+            let label = PetWireText.normalize(event.label)
+            return .activity(PetActivityEvent(provider: event.provider, sessionId: event.sessionId, turnId: event.turnId,
+                                              eventId: event.eventId, kind: event.kind, occurredAt: event.occurredAt,
+                                              toolId: event.toolId, label: label))
         }
         let envelope = try JSONDecoder().decode(WireMessage.self, from: data)
         try validateID(envelope.sourceId, name: "sourceId")
@@ -85,7 +88,12 @@ public enum BridgeMessage: Sendable {
                 }
             }
             return .snapshot(SourceSnapshot(sourceId: envelope.sourceId, sourceLabel: label,
-                                            seq: envelope.seq, sessions: sessions))
+                                            seq: envelope.seq, sessions: sessions.map { session in
+                                                SessionSnapshot(sessionId: session.sessionId, turn: session.turn,
+                                                                phase: session.phase, activeTools: session.activeTools,
+                                                                pendingApprovals: session.pendingApprovals, result: session.result,
+                                                                title: PetWireText.normalize(session.title))
+                                            }))
         default:
             throw BridgeMessageError.invalid("unknown message type")
         }

@@ -88,14 +88,15 @@ struct HookAdapterTests {
         #expect(try a.eventId != HookAdapter.normalize(original, provider: .claudeCode)?.eventId)
     }
 
-    @Test func wireContainsExactlyEightMetadataFieldsAndExplicitNulls() throws {
+    @Test func wireContainsExactlyNineMetadataFieldsAndExplicitNulls() throws {
         let data = try input("SessionStart", ["turn_id": NSNull(), "tool_use_id": NSNull(),
             "prompt": "private prompt", "last_assistant_message": "private answer", "cwd": "/private/work",
             "transcript_path": "/secret/transcript", "tool_input": ["api_key": "secret key"]])
         let event = try #require(try HookAdapter.normalize(data, provider: .codex))
         let encoded = try HookAdapter.encode(event)
         let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-        #expect(Set(object.keys) == Set(["type", "provider", "sessionId", "turnId", "eventId", "kind", "occurredAt", "toolId"]))
+        #expect(Set(object.keys) == Set(["type", "provider", "sessionId", "turnId", "eventId", "kind", "occurredAt", "toolId", "label"]))
+        #expect(object["label"] as? String == "work")
         #expect(object["turnId"] is NSNull)
         #expect(object["toolId"] is NSNull)
         let text = String(decoding: encoded, as: UTF8.self)
@@ -103,6 +104,40 @@ struct HookAdapterTests {
             #expect(!text.contains(secret))
         }
         #expect(try JSONDecoder().decode(PetActivityEvent.self, from: encoded) == event)
+    }
+
+    @Test func cwdLabelUsesOnlyTheLastComponentAndNormalizesScalars() throws {
+        for provider in [PetProvider.codex, .claudeCode] {
+            for cwd in ["/Users/person/project", "/Users/person/project/", "/Users/person/ \u{0000}project\t "] {
+                let event = try #require(try HookAdapter.normalize(input("Stop", ["cwd": cwd]), provider: provider))
+                #expect(event.label == "project")
+                #expect(!String(decoding: try HookAdapter.encode(event), as: UTF8.self).contains("/Users/person"))
+            }
+            for cwd in ["/", "///", "", " \n ", "/\u{0000}\t "] {
+                let event = try #require(try HookAdapter.normalize(input("Stop", ["cwd": cwd]), provider: provider))
+                #expect(event.label == nil)
+            }
+            let missing = try #require(try HookAdapter.normalize(input("Stop"), provider: provider))
+            #expect(missing.label == nil)
+            let object = try #require(JSONSerialization.jsonObject(with: HookAdapter.encode(missing)) as? [String: Any])
+            #expect(object["label"] is NSNull)
+            var cases = [(" \u{200b}项目\u{202e} ", "项目"),
+                         (String(repeating: "e\u{0301}", count: 129), String(repeating: "e\u{0301}", count: 128))]
+            for character in ["a", "中", "😀"] {
+                for count in [64, 65, 256, 257, 1024] {
+                    cases.append((String(repeating: character, count: count), String(repeating: character, count: min(count, 256))))
+                }
+            }
+            for (name, expected) in cases {
+                let event = try #require(try HookAdapter.normalize(input("Stop", ["cwd": "/parent/\(name)"]), provider: provider))
+                #expect(event.label == expected)
+                guard case .activity(let decoded) = try BridgeMessage.decode(HookAdapter.encode(event)) else {
+                    Issue.record("expected activity")
+                    continue
+                }
+                #expect(decoded == event)
+            }
+        }
     }
 
     @Test func malformedAndOversizedInputIsRejected() throws {

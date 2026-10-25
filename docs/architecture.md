@@ -3,7 +3,7 @@
 DSH 公开 `session` / `agent` 事件进入 [bridge](../bridge/lib/index.js)，由会话 reducer 维护工具和审批集合。
 插件源码位于 [hotheat/dsh-native-pet-plugin](https://github.com/hotheat/dsh-native-pet-plugin)，本仓库以 submodule 跟踪同一份实现。
 客户端把最新来源快照编码为 NDJSON，经本地 Unix socket 交给 Swift IPC 解码器。
-IPC 串行队列通过主队列 FIFO 提交给 `PetStore`，再由 AppDelegate 更新原生窗口、菜单和动画。
+IPC 串行队列通过主队列 FIFO 提交给 `PetStore`，再由应用层 PetMessageProjector 投影文案，AppDelegate 应用到原生窗口、菜单和动画。
 
 ```mermaid
 flowchart LR
@@ -12,7 +12,9 @@ flowchart LR
   Client --> Socket[Unix socket / NDJSON]
   Socket --> IPC[PetIPC]
   IPC --> Store[PetStore / MainActor]
-  Store --> UI[PetPanel / PetAnimator]
+  Store --> Projector[PetMessageProjector]
+  Projector --> UI[PetPanel / StatusMenu / SettingsView]
+  Store --> Animator[PetAnimator]
 ```
 
 SwiftPM 的 `PetCore` 只依赖 Foundation，`PetIPC` 依赖 Core、Darwin 与 Dispatch。
@@ -28,7 +30,15 @@ SwiftPM 的 `PetCore` 只依赖 Foundation，`PetIPC` 依赖 Core、Darwin 与 D
 
 协议及边界样例的权威入口为 [schema](../contracts/bridge.schema.json) 和 [fixtures](../contracts/fixtures/)。
 协议 v1 允许缺省 `v` 或整数 `v: 1`，解码器忽略未知可选字段，保留必需键、类型、枚举、范围、大小和身份校验。
-DSH 插件和 hook helper 继续输出不带 `v` 的现有字段集。
+DSH 插件和 hook helper 输出不带 `v` 的消息。
+会话快照的可选 `title` 来自 `session/title` 实时事件与 `sessionProjections` 的 `title` 初始投影；投影服务缺失时继续接收事件。
+activity 的可选 `label` 来自 hook 输入 `cwd` 的末级目录，完整路径不进入协议。
+两字段均接受字符串或 null，缺字段时归一为 null。
+生产者和解码器均去除 Unicode Cc/Cf 字符、trim 首尾空白，再按 Unicode 标量（码点）截断到 256，空串归一为 null。
+归一化入口为 JS 的 `bridge/lib/text.js` 与 Swift 的 `PetCore/PetWireText.swift`，hook 的 cwd label 也使用同一规则。
+[schema](../contracts/bridge.schema.json) 的 `maxLength: 256` 表示生产者输出的码点上限；解码器对超限 title/label 截断，保留整条消息，不使用字段字节上限。
+有效 fixtures 的 `normalized` 记录完整归一化 wire 消息，含 null 字段，剥离 v 和未知字段；JS 比较对象，Swift 重新编码为键排序的 canonical JSON 后比较，双份 fixtures 逐字节校验。
+DSH 标题由宿主按提示词生成，可能含提示词摘要；气泡和设置使用标题，系统通知中的标题显示由默认关闭的偏好控制。
 未知版本由 decoder 抛出 `unsupportedVersion`，IPC 在换行帧和 EOF 末帧经 `onIncompatible` 报告后关闭该 client。
 提示通过 dispatcher 写入 `PetStatusModel.protocolWarning`，在菜单和设置显示，保持到进程退出。
 它独立于连接错误和 PetStore，其他来源及桌宠文字继续正常呈现。
@@ -49,7 +59,7 @@ DSH 事件回调不等待 socket 写入，背压期间仅保留最新快照。
 IPC 启动失败经统一 fail/shutdown 路径退出，避免留下无锁实例。
 
 用户偏好保存在 UserDefaults；任务状态只存在内存。
-传输内容仅含来源、会话标识、计数和任务状态，不包含聊天正文或凭据。
+传输内容包含来源、会话标识、可选会话标题、计数和任务状态，不包含聊天正文或凭据。
 
 
 ## 角色资源与播放
@@ -72,6 +82,9 @@ DSH Pet 以 idle 人物高度为尺度，所有动画采用共同包络，保持
 
 Codex 与 Claude Code 的原始 hooks 由 PetHooks adapter 转换为 PetActivityEvent，短命 helper 通过同一 Unix socket 一次性交付。
 DSH 快照仍按长连接与心跳管理；activity 连接退出不触发会话清理，会话生命周期由 PetStore 管理。
+C4 保留两种输入：快照可在重连时建立基线，并在背压时合并为最新状态；hook 事实不可合并，丢失单个事件可能改变回合、工具或提醒状态。
+统一为原始事实会改变上述交付与重连语义，因此当前不执行该改造。
+C6 暂缓：目前只有 Codex 与 Claude Code 两个宿主 adapter；接入第三个宿主时再评估宿主登记表，避免为两个已知目标先造 registry。
 来源与会话共同确定身份，回合标识阻止旧回合污染新状态，工具标识处理并行与乱序结果。
 已有 turnID 的会话只由 `turnStarted` 切换回合；只有 SessionStart 的会话可由任意首个带 turnId 的事件建立回合。
 陌生回合的其他事件直接丢弃，也不刷新接收时间；因此丢失新回合的 turnStarted 会丢失该回合的后续状态和提醒。
@@ -85,8 +98,26 @@ Hook 时间戳来自 helper 接收时间，缺少宿主全序，极晚到达的�
 
 PetStore 保留来源标签并分别计算当前呈现与一次性 PetNotice，避免其他执行任务遮蔽完成提醒。
 提醒队列保留整批合法提醒；event、tool、retiredTurn、session 和输入字节上限仍由现有实现限制。
-`PetPresentation.feedback` 提供 pose、无来源前缀的 text 和可选 sourceLabel；AppDelegate 按字段排版，`presentation.text` 保留 Core 文案。
-AppDelegate 每次刷新通过 PetNotificationDispatcher 消费提醒，生产使用 UserNotifications adapter，联合测试使用录制 adapter。
+`PresentedSession` 持有 `session: SessionSnapshot` 与来源标识、来源标签、isStale，标题与计数从 session 读取。
+`PetPresentation` 提供姿态、计数、会话、hasReceivedHook 和可选 feedback；hasReceivedHook 区分尚未连接宿主与 hook 历史退出后的就绪状态。
+`PresentedFeedback` 只携带 pose、kind、sourceLabel、title，snapshot 和 hook 都填来源标签。
+`PetFeedbackKind` 区分 completed、failed、interrupted、blocked、maxTokens、other，Core 不包含用户文案。
+`PetNotice` 保留通知身份、来源、会话、kind、feedback、sessionTitle 与 turnDuration；waiting 的 feedback 为 nil，其他通知携带对应结果种类。
+
+应用层 [PetMessageProjector](../native/Sources/DSHNativePet/Presentation/PetMessageProjector.swift) 是气泡、菜单/设置摘要、会话行和通知正文的文案来源。
+[PetStatusModel](../native/Sources/DSHNativePet/Presentation/PetStatusModel.swift) 维护可观察状态，委托 projector 生成摘要与会话行；SettingsView 只呈现视图。
+AppDelegate 更新 lastActivity 后，将 presentation、时间与交互标志交给 [PetPoseDecision](../native/Sources/DSHNativePet/PetPoseDecision.swift)，按 idle 满 60 秒睡眠、poke、drag、demo 的顺序覆盖姿态。
+最终 pose、气泡宽度与 connectionError 传给 projector；动画开关、系统挂起与 demo 文字覆盖由 AppDelegate 应用。
+带标题的等待与完成气泡由 projector 调用原有 `Presentation/PetBubbleFit`，以 11pt 字体和扣除内边距的文本宽度测量，按 grapheme 边界裁剪标题并保留状态。
+完成统一为“本轮回应已结束”，带标题时为“「标题」已完成”；无标题反馈中，失败与受阻的正文已含来源，其余结果使用来源前缀；并行完成使用来源/标题与剩余活动两行排版。
+设置会话行优先显示标题；通知默认标题为“宿主标签 会话提醒”。
+设置中的“在通知中显示会话标题”对应 `pet.notificationSessionTitle`，默认关闭，自动化模式沿用 persistChanges 禁止写入偏好。
+开启后，PetStore 随四类 PetNotice 传递会话标题，AppDelegate 将偏好传给 dispatcher，再由 projector 将非空标题扁平化并按现有 40 字上限截断，通知标题行显示“宿主标签 · 会话标题”。
+无标题时保留默认标题；通知正文、声音与时长过滤、userInfo/threadIdentifier 和点击定位保持原有行为。
+
+AppDelegate 每次刷新通过 PetNotificationDispatcher 消费提醒，dispatcher 保留开关、时长过滤和声音策略，再调用 projector 生成 [PetNotificationContent](../native/Sources/DSHNativePet/Presentation/PetNotificationContent.swift)。
+content 包含 id、kind、title/body、sound、threadIdentifier、userInfo，并保留 sourceLabel 供 capture 日志使用。
+系统 adapter 只把投影内容映射为 UserNotifications 请求，录制 adapter 保存相同 content，并在 JSONL 中记录声音、threadIdentifier、userInfo 及原有身份字段。
 `PetStore.nextDeadline(after:)` 驱动 hook 等待去抖和反馈到期的精确单次刷新，不依赖 1 秒定时器。
 系统通知只在等待和出错时发声；通知携带 sourceId / sessionId，点击后经 AppDelegate 打开设置并定位会话行。
 系统通知权限或开关不影响桌宠显示；自动化入口不写用户偏好。

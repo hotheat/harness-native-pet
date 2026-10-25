@@ -26,7 +26,7 @@ enum PetNotificationAuthorization: String, Sendable {
 protocol PetNotificationAdapter: AnyObject {
     var onOpen: ((String, String) -> Void)? { get set }
     func authorization(request: Bool) async -> PetNotificationAuthorization
-    func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void)
+    func submit(_ notice: PetNotificationContent, completion: @escaping @MainActor @Sendable (String?) -> Void)
 }
 
 /// 仅正常应用启动使用；测试和截图路径使用录制 adapter。
@@ -63,14 +63,14 @@ final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUs
         }
     }
 
-    func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void) {
+    func submit(_ notice: PetNotificationContent, completion: @escaping @MainActor @Sendable (String?) -> Void) {
         Task { @MainActor in
             let error = await Self.systemSubmit(notice)
             completion(error)
         }
     }
 
-    private nonisolated static func systemSubmit(_ notice: PetNotice) async -> String? {
+    private nonisolated static func systemSubmit(_ notice: PetNotificationContent) async -> String? {
         let content = Self.content(for: notice)
         let request = UNNotificationRequest(identifier: notice.id, content: content, trigger: nil)
         do {
@@ -79,13 +79,13 @@ final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUs
         } catch { return error.localizedDescription }
     }
 
-    nonisolated static func content(for notice: PetNotice) -> UNMutableNotificationContent {
+    nonisolated static func content(for notice: PetNotificationContent) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = notice.title
         content.body = notice.body
-        if notice.kind == .waiting || notice.kind == .error { content.sound = .default }
-        content.threadIdentifier = "\(notice.sourceId):\(notice.sessionId)"
-        content.userInfo = ["sourceId": notice.sourceId, "sessionId": notice.sessionId]
+        if notice.sound { content.sound = .default }
+        content.threadIdentifier = notice.threadIdentifier
+        content.userInfo = notice.userInfo
         return content
     }
 
@@ -109,7 +109,7 @@ final class SystemPetNotificationAdapter: NSObject, PetNotificationAdapter, UNUs
 @MainActor
 final class RecordingPetNotificationAdapter: PetNotificationAdapter {
     var onOpen: ((String, String) -> Void)?
-    private(set) var notices: [PetNotice] = []
+    private(set) var notices: [PetNotificationContent] = []
     private let logURL: URL?
 
     init(logURL: URL? = nil) throws {
@@ -121,13 +121,14 @@ final class RecordingPetNotificationAdapter: PetNotificationAdapter {
 
     func authorization(request: Bool) async -> PetNotificationAuthorization { .recording }
 
-    func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void) {
+    func submit(_ notice: PetNotificationContent, completion: @escaping @MainActor @Sendable (String?) -> Void) {
         do {
             if let logURL {
-                let payload: [String: String] = [
-                    "id": notice.id, "sourceId": notice.sourceId, "sourceLabel": notice.sourceLabel,
-                    "sessionId": notice.sessionId, "kind": notice.kind.rawValue,
-                    "title": notice.title, "body": notice.body,
+                let payload: [String: Any] = [
+                    "id": notice.id, "sourceId": notice.userInfo["sourceId"] ?? "", "sourceLabel": notice.sourceLabel,
+                    "sessionId": notice.userInfo["sessionId"] ?? "", "kind": notice.kind.rawValue,
+                    "title": notice.title, "body": notice.body, "sound": notice.sound,
+                    "threadIdentifier": notice.threadIdentifier, "userInfo": notice.userInfo,
                 ]
                 var data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
                 data.append(0x0a)
@@ -163,13 +164,15 @@ final class PetNotificationDispatcher {
         return await adapter.authorization(request: true)
     }
 
-    func refresh(store: PetStore, enabled: Bool, minimumDuration: TimeInterval = 0, at: Date = Date()) {
+    func refresh(store: PetStore, enabled: Bool, minimumDuration: TimeInterval = 0, showSessionTitles: Bool = false, at: Date = Date()) {
         let notices = store.drainNotices(at: at)
         guard enabled else { return }
         for notice in notices {
             if [.ended, .interrupted].contains(notice.kind), let duration = notice.turnDuration, duration < minimumDuration { continue }
             requestCount += 1
-            adapter.submit(notice) { [weak self] error in
+            let sound = notice.kind == .waiting || notice.kind == .error
+            let content = PetMessageProjector.notificationContent(notice, sound: sound, showSessionTitle: showSessionTitles)
+            adapter.submit(content) { [weak self] error in
                 self?.onError?(error)
             }
         }

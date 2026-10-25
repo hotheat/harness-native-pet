@@ -22,7 +22,7 @@ struct ActivityStoreTests {
         #expect(notices.count == 1)
         #expect(notices.first?.kind == .ended)
         #expect(notices.first?.sourceLabel == "Codex")
-        #expect(notices.first?.body == "本轮回应已结束")
+        #expect(notices.first?.feedback == .completed)
         #expect(store.drainNotices(at: now).isEmpty)
     }
 
@@ -52,7 +52,7 @@ struct ActivityStoreTests {
         let presentation = store.presentation(at: now.addingTimeInterval(1))
         #expect(presentation.pose == .error)
         #expect(presentation.feedback?.pose == .error)
-        #expect(presentation.feedback?.text == "本轮回应出错，请查看 Codex")
+        #expect(presentation.feedback?.kind == .failed)
         store.apply(event(.failed, id: "failure-again", time: 1002), at: now.addingTimeInterval(2))
         #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
     }
@@ -65,8 +65,8 @@ struct ActivityStoreTests {
         #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.interrupted])
         let presentation = store.presentation(at: now.addingTimeInterval(1))
         #expect(presentation.pose == .idle)
-        #expect(presentation.sessions.first?.phase == .stopped)
-        #expect(presentation.feedback?.text == "本轮回应已中断")
+        #expect(presentation.sessions.first?.session.phase == .stopped)
+        #expect(presentation.feedback?.kind == .interrupted)
         store.apply(event(.interrupted, id: "interrupt-again", time: 1002), at: now.addingTimeInterval(2))
         #expect(store.drainNotices(at: now.addingTimeInterval(2)).isEmpty)
     }
@@ -97,20 +97,20 @@ struct ActivityStoreTests {
             let value = store.presentation(at: now.addingTimeInterval(899))
             #expect(value.sessions.count == 1)
             #expect(value.sessions.first?.isStale == false)
-            #expect(value.text == "准备就绪")
+            #expect(value.pose == .idle && value.feedback == nil && value.hasReceivedHook)
             let expired = store.presentation(at: now.addingTimeInterval(900))
             #expect(expired.sessions.isEmpty)
-            #expect(expired.text == "准备就绪")
+            #expect(expired.pose == .idle && expired.feedback == nil && expired.hasReceivedHook)
         }
     }
 
     @Test func hookReceiptKeepsEmptyStateReadyAfterCloseAndPruning() {
         let store = PetStore()
-        #expect(store.presentation(at: now).text == "未连接宿主")
+        #expect(!store.presentation(at: now).hasReceivedHook)
         store.apply(event(.sessionStarted, turn: nil), at: now)
         store.apply(event(.sessionEnded, turn: nil), at: now.addingTimeInterval(1))
-        #expect(store.presentation(at: now.addingTimeInterval(1)).text == "准备就绪")
-        #expect(store.presentation(at: now.addingTimeInterval(86_401)).text == "准备就绪")
+        #expect(store.presentation(at: now.addingTimeInterval(1)).hasReceivedHook)
+        #expect(store.presentation(at: now.addingTimeInterval(86_401)).hasReceivedHook)
     }
 
     @Test func hookDurationUsesEventTimeFromTurnStartAndWaitingHasNoDuration() {
@@ -134,14 +134,14 @@ struct ActivityStoreTests {
         store.apply(event(.toolStarted, tool: "a"), at: now)
         store.apply(event(.toolStarted, tool: "a"), at: now)
         store.apply(event(.toolStarted, tool: "b"), at: now)
-        #expect(store.presentation(at: now).sessions.first?.activeTools == 2)
+        #expect(store.presentation(at: now).sessions.first?.session.activeTools == 2)
         store.apply(event(.toolFinished, tool: "a"), at: now)
         store.apply(event(.toolFinished, tool: "late"), at: now)
         store.apply(event(.toolStarted, tool: "late"), at: now)
-        #expect(store.presentation(at: now).sessions.first?.activeTools == 1)
+        #expect(store.presentation(at: now).sessions.first?.session.activeTools == 1)
         store.apply(event(.toolFinished, tool: "b"), at: now)
         #expect(store.presentation(at: now).pose == .thinking)
-        #expect(store.presentation(at: now).sessions.first?.activeTools == 0)
+        #expect(store.presentation(at: now).sessions.first?.session.activeTools == 0)
     }
 
     @Test func stopResumesButOldTurnCannotEndNewTurn() {
@@ -188,7 +188,7 @@ struct ActivityStoreTests {
         store.apply(event(.running, time: 1001), at: now)
         store.apply(event(.turnStarted, time: 1000), at: now)
         #expect(store.presentation(at: now.addingTimeInterval(1)).pose == .waiting)
-        #expect(store.presentation(at: now.addingTimeInterval(1)).sessions.first?.activeTools == 0)
+        #expect(store.presentation(at: now.addingTimeInterval(1)).sessions.first?.session.activeTools == 0)
         #expect(store.drainNotices(at: now.addingTimeInterval(1)).map(\.kind) == [.waiting])
         store.apply(event(.running, time: 1004), at: now.addingTimeInterval(2))
         store.apply(event(.waiting, time: 1003), at: now.addingTimeInterval(3))
@@ -224,7 +224,7 @@ struct ActivityStoreTests {
         #expect(store.drainNotices(at: now).isEmpty)
         #expect(store.presentation(at: now).pose == .thinking)
         store.apply(event(.failed, provider: .claudeCode), at: now)
-        #expect(store.drainNotices(at: now).first?.body.contains("Claude Code") == true)
+        #expect(store.drainNotices(at: now).first?.sourceLabel == "Claude Code")
     }
 
     @Test func staleHookBecomesNeutralWithoutInventingCompletionAndEventuallyPrunes() {
@@ -232,7 +232,6 @@ struct ActivityStoreTests {
         store.apply(event(.toolStarted, tool: "tool"), at: now)
         let stale = store.presentation(at: now.addingTimeInterval(901))
         #expect(stale.pose == .idle)
-        #expect(stale.text == "状态待确认")
         #expect(stale.sessions.first?.isStale == true)
         #expect(stale.activeCount == 0)
         #expect(store.drainNotices(at: now.addingTimeInterval(901)).isEmpty)
@@ -263,7 +262,7 @@ struct ActivityStoreTests {
         }
         let value = store.presentation(at: now.addingTimeInterval(301))
         #expect(value.sessions.count <= 256)
-        #expect(value.sessions.contains { $0.sessionId == "active" && $0.phase == .thinking })
+        #expect(value.sessions.contains { $0.session.sessionId == "active" && $0.session.phase == .thinking })
     }
     @Test func stopActivityStopNotifiesAgainAndClearsFeedback() {
         for kind in [PetActivityKind.running, .toolStarted, .toolFinished, .waiting] {
@@ -272,8 +271,8 @@ struct ActivityStoreTests {
             #expect(store.drainNotices(at: now).count == 1)
             store.apply(event(kind, tool: kind == .toolStarted || kind == .toolFinished ? "work" : nil, time: 1001), at: now.addingTimeInterval(1))
             let resumed = store.presentation(at: now.addingTimeInterval(1.31))
-            #expect(resumed.sessions.first?.result == nil)
-            #expect(!resumed.text.contains("结束"))
+            #expect(resumed.sessions.first?.session.result == nil)
+            #expect(resumed.feedback == nil)
             #expect(resumed.pose == (kind == .waiting ? .waiting : kind == .running || kind == .toolStarted ? .working : .thinking))
             store.apply(event(.turnEnded, time: 1002), at: now.addingTimeInterval(2))
             #expect(store.drainNotices(at: now.addingTimeInterval(2)).map(\.kind) == [.ended])
@@ -289,7 +288,7 @@ struct ActivityStoreTests {
             for kind in [PetActivityKind.running, .toolStarted, .toolFinished, .waiting] {
                 store.apply(event(kind, tool: "old", time: terminal == .turnEnded ? 1001 : 1003), at: now)
             }
-            #expect(store.presentation(at: now).sessions.first?.phase == (terminal == .failed ? .error : terminal == .interrupted ? .stopped : .completed))
+            #expect(store.presentation(at: now).sessions.first?.session.phase == (terminal == .failed ? .error : terminal == .interrupted ? .stopped : .completed))
             #expect(store.drainNotices(at: now.addingTimeInterval(1)).isEmpty)
         }
     }
@@ -313,7 +312,7 @@ struct ActivityStoreTests {
                 let store = PetStore()
                 store.apply(event(.sessionStarted, turn: nil), at: now)
                 store.apply(event(kind, turn: "first", tool: kind == .toolStarted ? "tool" : nil, time: time), at: now)
-                #expect(store.presentation(at: now.addingTimeInterval(1)).sessions.first?.phase == (kind == .toolStarted ? .working : kind == .waiting ? .waiting : .completed))
+                #expect(store.presentation(at: now.addingTimeInterval(1)).sessions.first?.session.phase == (kind == .toolStarted ? .working : kind == .waiting ? .waiting : .completed))
             }
         }
     }
@@ -324,7 +323,7 @@ struct ActivityStoreTests {
             store.apply(event(.turnStarted), at: now)
             store.apply(event(.waiting, time: 1003), at: now)
             store.apply(event(kind, time: 1002), at: now)
-            #expect(store.presentation(at: now).sessions.first?.phase == (kind == .failed ? .error : kind == .interrupted ? .stopped : .completed))
+            #expect(store.presentation(at: now).sessions.first?.session.phase == (kind == .failed ? .error : kind == .interrupted ? .stopped : .completed))
             #expect(store.drainNotices(at: now).count == 1)
             if kind == .turnEnded {
                 store.apply(event(.running, time: 1002.5), at: now)
@@ -346,7 +345,7 @@ struct ActivityStoreTests {
             let expired = store.presentation(at: now.addingTimeInterval(901))
             #expect(expired.sessions.isEmpty)
             #expect(expired.connectedSources == 0)
-            #expect(expired.text == "准备就绪")
+            #expect(expired.pose == .idle && expired.feedback == nil && expired.hasReceivedHook)
             store.apply(event(kind), at: now.addingTimeInterval(902))
             #expect(store.drainNotices(at: now.addingTimeInterval(902)).count == 1)
         }

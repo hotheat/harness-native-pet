@@ -26,6 +26,7 @@ final class PetPreferences: ObservableObject {
     @Published var clickThrough: Bool { didSet { if persistChanges { defaults.set(clickThrough, forKey: "pet.clickThrough") } } }
     @Published var animations: Bool { didSet { if persistChanges { defaults.set(animations, forKey: "pet.animations") } } }
     @Published var systemNotifications: Bool { didSet { if persistChanges { defaults.set(systemNotifications, forKey: "pet.systemNotifications") } } }
+    @Published var notificationSessionTitle: Bool { didSet { if persistChanges { defaults.set(notificationSessionTitle, forKey: "pet.notificationSessionTitle") } } }
     @Published var size: Size { didSet { if persistChanges { defaults.set(size.rawValue, forKey: "pet.size") } } }
 
     init(defaults: UserDefaults = .standard, persistChanges: Bool = true) {
@@ -38,6 +39,7 @@ final class PetPreferences: ObservableObject {
         clickThrough = defaults.bool(forKey: "pet.clickThrough")
         animations = defaults.object(forKey: "pet.animations") == nil ? true : defaults.bool(forKey: "pet.animations")
         systemNotifications = defaults.object(forKey: "pet.systemNotifications") == nil ? true : defaults.bool(forKey: "pet.systemNotifications")
+        notificationSessionTitle = defaults.bool(forKey: "pet.notificationSessionTitle")
         size = Size(rawValue: defaults.string(forKey: "pet.size") ?? "") ?? .medium
     }
 
