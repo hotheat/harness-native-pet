@@ -479,7 +479,7 @@ struct PetNotificationTests {
         let name = "PetNotificationTests.\(UUID())"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
-        #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 10)
+        #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 3)
         defaults.set(2.5, forKey: "pet.noticeMinimumSeconds")
         #expect(PetPreferences(defaults: defaults).noticeMinimumSeconds == 2.5)
         defaults.set("0", forKey: "pet.noticeMinimumSeconds")
