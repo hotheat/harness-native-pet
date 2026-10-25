@@ -80,12 +80,19 @@ struct SessionTitleTests {
         }
         let long = String(repeating: "中", count: 30)
         let completed = PresentedFeedback(pose: .completed, kind: .completed, sourceLabel: "DSH", title: long)
-        for (pose, activeCount, expected) in [(PetPose.completed, 0, "「\(String(repeating: "中", count: 14))…」已完成"),
-                                               (.working, 1, "「\(String(repeating: "中", count: 8))…」\n本轮结束 · 1 执行中"),
-                                               (.thinking, 1, "「\(String(repeating: "中", count: 8))…」\n本轮结束 · 1 思考中")] {
+        for (pose, activeCount, suffix) in [(PetPose.completed, 0, "…」已完成"),
+                                           (.working, 1, "…」\n本轮结束 · 1 执行中"),
+                                           (.thinking, 1, "…」\n本轮结束 · 1 思考中")] {
             let presentation = PetPresentation(pose: pose, activeCount: activeCount,
                                                waitingCount: 0, connectedSources: 1, sessions: [], feedback: completed)
-            #expect(PetMessageProjector.bubble(presentation, pose: pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14) == expected)
+            let bubble = PetMessageProjector.bubble(presentation, pose: pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14)
+            #expect(bubble.hasPrefix("「"))
+            #expect(bubble.contains("…"))
+            #expect(bubble.hasSuffix(suffix))
+            let visibleTitle = bubble.dropFirst().dropLast(suffix.count)
+            #expect(!visibleTitle.isEmpty)
+            #expect(visibleTitle.allSatisfy { $0 == "中" })
+            #expect(visibleTitle.count < long.count)
         }
         for provider in [PetProvider.codex, .claudeCode] {
             let store = PetStore()

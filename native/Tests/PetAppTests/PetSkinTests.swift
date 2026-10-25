@@ -153,6 +153,10 @@ struct PetSkinTests {
         let first = try #require(decoded)
         #expect(first.transparentPixels > 0)
         #expect(first.opaquePixels > 0)
+        for _ in 0..<40 {
+            if view.characterLayer.contents == nil { break }
+            try await Task.sleep(for: .milliseconds(25))
+        }
         #expect(view.characterLayer.contents == nil)
         try await Task.sleep(for: .milliseconds(350))
         let second = try #require(view.videoPlayback.decodedFrame())
