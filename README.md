@@ -74,6 +74,22 @@ dsh plugin --profile web add "$PWD/bridge/dsh-native-pet-0.1.0.tgz"
 bash scripts/smoke-package.sh
 ```
 
+## 素材来源
+
+| 素材 | 来源 | 本地位置 | 说明 |
+| --- | --- | --- | --- |
+| 双丸子头小女孩 | 用户提供的 `hanzi-evolution-atlas/designs/ip-assets/two-head-q-girl` 参考图 | `designs/two-head-q-girl/`、`native/Sources/DSHNativePet/Resources/Character/` | 保留参考副本与生成提示词；九张透明 PNG 由 Codex image_gen 生成或编辑 |
+| DSH Pet（鲸鱼娘） | [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) 的 `assets-mov` release | `native/Sources/DSHNativePet/Resources/DSHPet/` | 九段 HEVC-alpha MOV 保留原始字节；PNG 为各段首帧；MIT 许可随资源保留 |
+| 应用与菜单栏图标 | 用户提供的 `Pet Bed.svg`、`pet.svg` | `designs/icons/source/`、`native/Sources/DSHNativePet/Resources/Icons/` | 来源文件未附许可证，仓库只记录用户提供的来源 |
+
+- DSH Pet 的配置与许可按 commit `48007b64ac0bebb2e97ac88344aed62de8399dd4` 核对；`assets-mov` 是移动 tag，具体字节由 [sources.json](designs/dsh-pet/sources.json) 记录的 release digest、ZIP CRC、文件大小和逐文件 SHA-256 固定。
+- DSH Pet 的 MOV 只改为状态名，没有转码或修改字节；PNG 由 AVFoundation 解码对应 MOV 首帧得到，保留原始 640 × 360 画布和透明度。
+- 小女孩的参考图、逐姿态提示词、输入与输出哈希见 [designs/two-head-q-girl/README.md](designs/two-head-q-girl/README.md)。
+- 完整的素材映射、布局、尺寸和校验方法见 [素材说明](docs/assets.md)：
+  `swift scripts/validate-assets.swift` 校验小女孩，`swift scripts/validate-dsh-pet.swift` 校验 DSH Pet。
+
+## 相关文档
+
 - [开发与检查](docs/development.md)
 - [状态链路与模块边界](docs/architecture.md)
 - [素材来源与布局](docs/assets.md)
