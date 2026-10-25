@@ -12,9 +12,9 @@ public final class PetStore {
         let sessionID: String
         let resultID: String?
         let pose: PetPose
-        let text: String
+        let kind: PetFeedbackKind
         let sourceLabel: String?
-        var displayText: String { sourceLabel.map { "\($0)：\(text)" } ?? text }
+        let title: String?
         let expiresAt: Date
     }
     private struct SessionKey: Hashable {
@@ -24,6 +24,7 @@ public final class PetStore {
     private struct HookSession {
         let provider: PetProvider
         let sessionID: String
+        var title: String?
         var turnID: String?
         var retiredTurns: [String] = []
         var turnStartedAt: Double
@@ -79,8 +80,7 @@ public final class PetStore {
             if session.phase == .waiting {
                 if snapshotWaiting.insert(key).inserted, previous != nil {
                     recordNotice(id: "\(key.source):\(key.session):waiting:\(snapshot.seq)", source: key.source,
-                                 label: snapshot.sourceLabel, session: key.session, kind: .waiting,
-                                 body: "有待处理请求，请查看 \(snapshot.sourceLabel)")
+                                 label: snapshot.sourceLabel, session: key.session, kind: .waiting, sessionTitle: session.title)
                 }
             } else {
                 snapshotWaiting.remove(key)
@@ -89,20 +89,20 @@ public final class PetStore {
             guard let result = session.result else { continue }
             if previous != nil, !(resultIDs[session.sessionId] ?? []).contains(result.id) {
                 let pose: PetPose
-                let text: String
+                let feedbackKind: PetFeedbackKind
                 let kind: PetNoticeKind
                 switch result.outcome {
-                case "completed": (pose, text, kind) = (.completed, "任务已完成", .ended)
-                case "error": (pose, text, kind) = (.error, "任务未完成，请查看 \(snapshot.sourceLabel)", .error)
-                case "aborted": (pose, text, kind) = (.idle, "任务已停止", .interrupted)
-                case "blocked": (pose, text, kind) = (.idle, "任务受阻，请查看 \(snapshot.sourceLabel)", .ended)
-                case "max-tokens": (pose, text, kind) = (.idle, "达到输出上限", .ended)
-                default: (pose, text, kind) = (.idle, "本轮已结束", .ended)
+                case "completed": (pose, feedbackKind, kind) = (.completed, .completed, .ended)
+                case "error": (pose, feedbackKind, kind) = (.error, .failed, .error)
+                case "aborted": (pose, feedbackKind, kind) = (.idle, .interrupted, .interrupted)
+                case "blocked": (pose, feedbackKind, kind) = (.idle, .blocked, .ended)
+                case "max-tokens": (pose, feedbackKind, kind) = (.idle, .maxTokens, .ended)
+                default: (pose, feedbackKind, kind) = (.idle, .other, .ended)
                 }
                 recordNotice(id: "\(snapshot.sourceId):\(session.sessionId):\(result.id)", source: snapshot.sourceId,
-                             label: snapshot.sourceLabel, session: session.sessionId, kind: kind, body: text,
-                             turnDuration: activeSince[session.sessionId].map { at.timeIntervalSince($0) })
-                showFeedback(source: snapshot.sourceId, session: session.sessionId, resultID: result.id, pose: pose, text: text, at: at)
+                             label: snapshot.sourceLabel, session: session.sessionId, kind: kind, feedback: feedbackKind,
+                             turnDuration: activeSince[session.sessionId].map { at.timeIntervalSince($0) }, sessionTitle: session.title)
+                showFeedback(source: snapshot.sourceId, session: session.sessionId, resultID: result.id, pose: pose, kind: feedbackKind, sourceLabel: snapshot.sourceLabel, title: session.title, at: at)
             }
             resultIDs[session.sessionId, default: []].insert(result.id)
         }
@@ -145,6 +145,7 @@ public final class PetStore {
             state.result = nil
         }
         guard event.occurredAt >= state.turnStartedAt else { return }
+        if let label = event.label, event.occurredAt >= state.latestOccurredAt { state.title = label }
         state.latestOccurredAt = max(state.latestOccurredAt, event.occurredAt)
         state.lastReceivedAt = at
         if event.kind == .sessionEnded {
@@ -227,23 +228,23 @@ public final class PetStore {
             state.waitingAt = nil
             let kind: PetNoticeKind
             let pose: PetPose
-            let body: String
+            let feedbackKind: PetFeedbackKind
             switch event.kind {
             case .failed:
-                (state.phase, kind, pose, body) = (.error, .error, .error, "本轮回应出错，请查看 \(event.provider.title)")
+                (state.phase, kind, pose, feedbackKind) = (.error, .error, .error, .failed)
             case .interrupted:
-                (state.phase, kind, pose, body) = (.stopped, .interrupted, .idle, "本轮回应已中断")
+                (state.phase, kind, pose, feedbackKind) = (.stopped, .interrupted, .idle, .interrupted)
             default:
-                (state.phase, kind, pose, body) = (.completed, .ended, .completed, "本轮回应已结束")
+                (state.phase, kind, pose, feedbackKind) = (.completed, .ended, .completed, .completed)
             }
             state.result = SessionResult(id: event.eventId, outcome: event.kind == .failed ? "error" : event.kind == .interrupted ? "aborted" : "other")
             // A Stop can notify again only after observed same-turn activity.
             if shouldNotify {
                 recordNotice(id: dedupeID, source: event.sourceId, label: event.provider.title,
-                             session: event.sessionId, kind: kind, body: body,
-                             turnDuration: state.turnStartObserved ? event.occurredAt - state.turnStartedAt : nil)
+                             session: event.sessionId, kind: kind, feedback: feedbackKind,
+                             turnDuration: state.turnStartObserved ? event.occurredAt - state.turnStartedAt : nil, sessionTitle: state.title)
                 showFeedback(source: event.sourceId, session: event.sessionId, pose: pose,
-                             text: body, sourceLabel: event.provider.title, at: at)
+                             kind: feedbackKind, sourceLabel: event.provider.title, title: state.title, at: at)
             }
         case .sessionEnded:
             break
@@ -274,8 +275,7 @@ public final class PetStore {
             state.waitingNotified = true
             hooks[key] = state
             recordNotice(id: "\(key.source):\(key.session):waiting:\(waitingAt.timeIntervalSince1970)", source: key.source,
-                         label: state.provider.title, session: key.session, kind: .waiting,
-                         body: "有待处理请求，请查看 \(state.provider.title)")
+                         label: state.provider.title, session: key.session, kind: .waiting, sessionTitle: state.title)
         }
         let result = notices
         notices = []
@@ -290,15 +290,15 @@ public final class PetStore {
         return (waiting + [feedback?.expiresAt].compactMap { $0 }).filter { $0 > at }.min()
     }
 
-    private func recordNotice(id: String, source: String, label: String, session: String, kind: PetNoticeKind, body: String,
-                              turnDuration: TimeInterval? = nil) {
+    private func recordNotice(id: String, source: String, label: String, session: String, kind: PetNoticeKind, feedback: PetFeedbackKind? = nil,
+                              turnDuration: TimeInterval? = nil, sessionTitle: String? = nil) {
         notices.append(PetNotice(id: id, sourceId: source, sourceLabel: label, sessionId: session,
-                                 kind: kind, title: "\(label) 会话提醒", body: body, turnDuration: turnDuration))
+                                 kind: kind, feedback: feedback, turnDuration: turnDuration, sessionTitle: sessionTitle))
     }
 
-    private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, text: String, sourceLabel: String? = nil, at: Date) {
+    private func showFeedback(source: String, session: String, resultID: String? = nil, pose: PetPose, kind: PetFeedbackKind, sourceLabel: String? = nil, title: String? = nil, at: Date) {
         if pose == .error || feedback.map({ $0.pose != .error || $0.expiresAt <= at }) ?? true {
-            feedback = Feedback(sourceID: source, sessionID: session, resultID: resultID, pose: pose, text: text, sourceLabel: sourceLabel, expiresAt: at.addingTimeInterval(3))
+            feedback = Feedback(sourceID: source, sessionID: session, resultID: resultID, pose: pose, kind: kind, sourceLabel: sourceLabel, title: title, expiresAt: at.addingTimeInterval(3))
         }
     }
 
@@ -334,32 +334,25 @@ public final class PetStore {
             return PresentedSession(sourceId: key.source, sourceLabel: state.provider.title,
                                     session: SessionSnapshot(sessionId: key.session, turn: nil, phase: phase,
                                                              activeTools: stale ? 0 : state.tools.count,
-                                                             pendingApprovals: phase == .waiting ? 1 : 0, result: state.result), isStale: stale)
+                                                             pendingApprovals: phase == .waiting ? 1 : 0, result: state.result, title: state.title), isStale: stale)
         }
-        let waitingCount = sessions.filter { $0.phase == .waiting }.count
-        let activeCount = sessions.filter { $0.phase != .waiting && ([.running, .thinking, .working].contains($0.phase) || $0.activeTools > 0) }.count
+        let waitingCount = sessions.filter { $0.session.phase == .waiting }.count
+        let activeCount = sessions.filter { $0.session.phase != .waiting && ([.running, .thinking, .working].contains($0.session.phase) || $0.session.activeTools > 0) }.count
         if let current = feedback, current.expiresAt <= at { feedback = nil }
         let pose: PetPose
-        let text: String
         if waitingCount > 0 {
             pose = .waiting
-            let labels = Set(sessions.filter { $0.phase == .waiting }.map(\.sourceLabel)).sorted().joined(separator: "、")
-            text = "\(waitingCount) 个会话待处理，请查看 \(labels)" + (activeCount > 0 ? "，\(activeCount) 个仍在执行" : "")
-        } else if sessions.contains(where: { [.working, .running].contains($0.phase) || $0.activeTools > 0 }) {
+        } else if sessions.contains(where: { [.working, .running].contains($0.session.phase) || $0.session.activeTools > 0 }) {
             pose = .working
-            text = feedback?.pose == .completed ? "\(feedback!.displayText)，\(activeCount) 个会话仍在执行" : "\(activeCount) 个会话正在执行"
-        } else if sessions.contains(where: { $0.phase == .thinking }) {
+        } else if sessions.contains(where: { $0.session.phase == .thinking }) {
             pose = .thinking
-            text = feedback?.pose == .completed ? "\(feedback!.displayText)，\(activeCount) 个会话仍在思考" : "正在思考"
         } else if let current = feedback {
             pose = current.pose
-            text = current.displayText
         } else {
             pose = .idle
-            text = sessions.contains(where: \.isStale) ? "状态待确认" : !receivedHook && sources.isEmpty && sessions.isEmpty ? "未连接宿主" : "准备就绪"
         }
-        return PetPresentation(pose: pose, text: text, activeCount: activeCount,
+        return PetPresentation(pose: pose, activeCount: activeCount,
                                waitingCount: waitingCount, connectedSources: sources.count + Set(sessions.filter { $0.sourceId.hasPrefix("hook:") }.map(\.sourceId)).count, sessions: sessions,
-                               feedback: feedback.map { PresentedFeedback(pose: $0.pose, text: $0.text, sourceLabel: $0.sourceLabel) })
+                               feedback: feedback.map { PresentedFeedback(pose: $0.pose, kind: $0.kind, sourceLabel: $0.sourceLabel, title: $0.title) }, hasReceivedHook: receivedHook)
     }
 }

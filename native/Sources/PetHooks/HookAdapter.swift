@@ -56,17 +56,24 @@ public enum HookAdapter {
         let eventID = SHA256.hash(data: digestInput).map { String(format: "%02x", $0) }.joined()
         return PetActivityEvent(provider: provider, sessionId: sessionID, turnId: turnID,
                                 eventId: eventID, kind: kind, occurredAt: occurredAt.timeIntervalSince1970,
-                                toolId: toolID)
+                                toolId: toolID, label: label(input["cwd"]))
     }
 
-    /// Explicit nulls keep the eight-field wire contract independent of synthesized Codable.
+    /// Explicit nulls keep the nine-field wire contract independent of synthesized Codable.
     public static func encode(_ event: PetActivityEvent) throws -> Data {
         try JSONSerialization.data(withJSONObject: [
             "type": event.type, "provider": event.provider.rawValue, "sessionId": event.sessionId,
             "turnId": event.turnId as Any? ?? NSNull(), "eventId": event.eventId,
             "kind": event.kind.rawValue, "occurredAt": event.occurredAt,
             "toolId": event.toolId as Any? ?? NSNull(),
+            "label": event.label as Any? ?? NSNull(),
         ], options: [.sortedKeys])
+    }
+
+    private static func label(_ value: Any?) -> String? {
+        guard let path = value as? String,
+              let component = path.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "/").last else { return nil }
+        return PetWireText.normalize(String(component))
     }
 
     private static func identity(_ value: Any?) -> String? {

@@ -116,14 +116,14 @@ struct PetSkinTests {
         for skin in [PetSkin.character, .dshPet, .character] {
             menu.selectSkin(skin)
             view.useAssets(preferences.skin == .character ? girl : dsh)
-            try view.render(pose: store.presentation().pose, text: state.text)
+            try view.render(pose: store.presentation().pose, text: PetMessageProjector.bubble(state, pose: state.pose, bubbleWidth: view.bounds.width - 14))
             view.layoutSubtreeIfNeeded()
             #expect(view.skin == skin)
             #expect(view.currentPose == .working)
             #expect(view.characterLayer.contents != nil)
             #expect(view.characterHeight == 100)
             #expect(view.frame == NSRect(x: 0, y: 0, width: 140, height: 154))
-            #expect(store.presentation().sessions.map(\.sessionId) == ["keep-session"])
+            #expect(store.presentation().sessions.map(\.session.sessionId) == ["keep-session"])
             #expect(store.presentation().activeCount == state.activeCount)
         }
     }

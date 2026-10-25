@@ -20,9 +20,10 @@ public struct PetActivityEvent: Codable, Equatable, Sendable {
     public let kind: PetActivityKind
     public let occurredAt: Double
     public let toolId: String?
+    public let label: String?
 
     public init(provider: PetProvider, sessionId: String, turnId: String?, eventId: String,
-                kind: PetActivityKind, occurredAt: Double, toolId: String?) {
+                kind: PetActivityKind, occurredAt: Double, toolId: String?, label: String? = nil) {
         type = "activity"
         self.provider = provider
         self.sessionId = sessionId
@@ -31,9 +32,10 @@ public struct PetActivityEvent: Codable, Equatable, Sendable {
         self.kind = kind
         self.occurredAt = occurredAt
         self.toolId = toolId
+        self.label = label
     }
 
-    enum CodingKeys: String, CodingKey { case type, provider, sessionId, turnId, eventId, kind, occurredAt, toolId }
+    enum CodingKeys: String, CodingKey { case type, provider, sessionId, turnId, eventId, kind, occurredAt, toolId, label }
 
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
@@ -45,6 +47,7 @@ public struct PetActivityEvent: Codable, Equatable, Sendable {
         try values.encode(kind, forKey: .kind)
         try values.encode(occurredAt, forKey: .occurredAt)
         try values.encode(toolId, forKey: .toolId)
+        try values.encode(label, forKey: .label)
     }
 
     public var sourceId: String { "hook:\(provider.rawValue)" }

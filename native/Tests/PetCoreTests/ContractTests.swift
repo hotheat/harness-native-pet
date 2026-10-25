@@ -3,25 +3,26 @@ import Testing
 @testable import PetCore
 
 struct ContractTests {
-    private func fixtures(_ file: String) throws -> [(String, Data)] {
+    private func fixtures(_ file: String) throws -> [(String, Data, Data?)] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: root.appendingPathComponent("contracts/fixtures/\(file)"))
         let values = try JSONSerialization.jsonObject(with: data) as! [[String: Any]]
         return try values.map { value in
-            (value["name"] as! String, try JSONSerialization.data(withJSONObject: value["message"]!))
+            (value["name"] as! String, try JSONSerialization.data(withJSONObject: value["message"]!),
+             try value["normalized"].map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) })
         }
     }
 
     @Test func sharedValidFixtures() throws {
-        for (name, data) in try fixtures("snapshots.json") + fixtures("activity.json") {
+        for (name, data, expected) in try fixtures("snapshots.json") + fixtures("activity.json") {
             let message = try BridgeMessage.decode(data)
-            #expect(!message.sourceID.isEmpty, Comment(rawValue: name))
+            #expect(try canonicalJSON(message) == #require(expected), Comment(rawValue: name))
         }
     }
 
     @Test func sharedInvalidFixtures() throws {
-        for (name, data) in try fixtures("invalid-messages.json") {
+        for (name, data, _) in try fixtures("invalid-messages.json") {
             #expect(throws: (any Error).self, Comment(rawValue: name)) { try BridgeMessage.decode(data) }
         }
     }
@@ -41,6 +42,7 @@ struct ContractTests {
         let object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
         #expect(object["turn"] is NSNull)
         #expect(object["result"] is NSNull)
+        #expect(object["title"] is NSNull)
     }
 
     @Test func activityBoundaryRequiresFieldsAndReservesHookSources() throws {
@@ -76,4 +78,68 @@ struct ContractTests {
         }
     }
 
+    @Test func optionalTitlesAndLabelsDecodeAndRoundTrip() throws {
+        for (_, data, _) in try fixtures("snapshots.json") {
+            guard case .snapshot(let snapshot) = try BridgeMessage.decode(data) else { continue }
+            for session in snapshot.sessions {
+                #expect(try JSONDecoder().decode(SessionSnapshot.self, from: JSONEncoder().encode(session)) == session)
+            }
+        }
+        for (name, data, _) in try fixtures("activity.json") {
+            guard case .activity(let event) = try BridgeMessage.decode(data) else { continue }
+            if name == "activity-with-label" { #expect(event.label == "harness-native-pet") }
+            if name == "activity-null-label" { #expect(event.label == nil) }
+        }
+    }
+
+    @Test func textNormalizationAndDecoderScalarBoundaries() throws {
+        var cases: [(String?, String?)] = [
+            (nil, nil), ("", nil), (" \t\u{200b} ", nil),
+            (" \0会\n话\u{007f}\u{0085}\u{200b}\u{202e}标题\u{feff} ", "会话标题"),
+            ("\u{00a0}\u{2000}\u{2028}标题\u{2029}\u{3000}", "标题"),
+            (String(repeating: "e\u{0301}", count: 129), String(repeating: "e\u{0301}", count: 128)),
+            (String(repeating: "中", count: 255) + "😀尾", String(repeating: "中", count: 255) + "😀"),
+        ]
+        for character in ["a", "中", "😀"] {
+            for count in [64, 65, 256, 257, 1024] {
+                cases.append((String(repeating: character, count: count), String(repeating: character, count: min(count, 256))))
+            }
+        }
+        #expect(PetWireText.maximumScalars == 256)
+        for (input, expected) in cases {
+            #expect(PetWireText.normalize(input) == expected)
+            let event = PetActivityEvent(provider: .codex, sessionId: "s", turnId: "t", eventId: "e",
+                                         kind: .waiting, occurredAt: 1000, toolId: nil, label: input)
+            guard case .activity(let decoded) = try BridgeMessage.decode(JSONEncoder().encode(event)) else {
+                Issue.record("expected activity")
+                continue
+            }
+            #expect(decoded.label == expected)
+            #expect(decoded.kind == .waiting)
+            let session = SessionSnapshot(sessionId: "s", turn: nil, phase: .idle,
+                                          activeTools: 0, pendingApprovals: 0, result: nil, title: input)
+            let message = BridgeMessage.snapshot(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 1, sessions: [session]))
+            guard case .snapshot(let snapshot) = try BridgeMessage.decode(canonicalJSON(message)) else {
+                Issue.record("expected snapshot")
+                continue
+            }
+            #expect(snapshot.sessions.first?.title == expected)
+        }
+    }
+
+    /// Re-encode the decoded wire fields, including explicit nulls, then sort JSON keys.
+    private func canonicalJSON(_ message: BridgeMessage) throws -> Data {
+        let object: Any
+        switch message {
+        case .activity(let event):
+            object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(event))
+        case .heartbeat(let heartbeat):
+            object = ["type": "heartbeat", "sourceId": heartbeat.sourceId, "seq": heartbeat.seq]
+        case .snapshot(let snapshot):
+            object = ["type": "snapshot", "sourceId": snapshot.sourceId, "sourceLabel": snapshot.sourceLabel,
+                      "seq": snapshot.seq,
+                      "sessions": try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot.sessions))]
+        }
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
 }

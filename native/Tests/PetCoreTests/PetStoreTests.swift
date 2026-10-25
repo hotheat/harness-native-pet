@@ -7,12 +7,50 @@ struct PetStoreTests {
     private let now = Date(timeIntervalSince1970: 1000)
 
     private func session(_ id: String = "s", phase: SessionPhase = .idle, turn: Int? = 1,
-                         tools: Int = 0, approvals: Int = 0, result: SessionResult? = nil) -> SessionSnapshot {
-        SessionSnapshot(sessionId: id, turn: turn, phase: phase, activeTools: tools, pendingApprovals: approvals, result: result)
+                         tools: Int = 0, approvals: Int = 0, result: SessionResult? = nil, title: String? = nil) -> SessionSnapshot {
+        SessionSnapshot(sessionId: id, turn: turn, phase: phase, activeTools: tools, pendingApprovals: approvals, result: result, title: title)
     }
 
     private func snapshot(_ sessions: [SessionSnapshot], seq: Int = 1, source: String = "a") -> SourceSnapshot {
         SourceSnapshot(sourceId: source, sourceLabel: "DSH", seq: seq, sessions: sessions)
+    }
+
+    @Test func snapshotTitleReachesSessionsAndCompletedFeedbackWithoutChangingNotices() {
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking, title: "初始标题")]), at: now)
+        #expect(store.presentation(at: now).sessions.first?.session.title == "初始标题")
+        store.apply(snapshot([session(phase: .waiting, title: "最新标题")], seq: 2), at: now)
+        #expect(store.presentation(at: now).sessions.first?.session.title == "最新标题")
+        #expect(store.drainNotices(at: now).first?.kind == .waiting)
+        store.apply(snapshot([session(phase: .completed, result: SessionResult(id: "r", outcome: "completed"), title: "最新标题")], seq: 3), at: now)
+        #expect(store.presentation(at: now).feedback?.title == "最新标题")
+        #expect(store.presentation(at: now).feedback?.kind == .completed)
+        let notice = store.drainNotices(at: now).first
+        #expect(notice?.sourceLabel == "DSH")
+        #expect(notice?.feedback == .completed)
+    }
+
+    @Test func hookLabelReachesWaitingSessionAndLatestLabelReachesCompletion() {
+        for provider in [PetProvider.codex, .claudeCode] {
+            let store = PetStore()
+            for (index, kind, label) in [(0, PetActivityKind.turnStarted, "first" as String?),
+                                          (1, .waiting, "project"), (2, .turnEnded, nil)] {
+                store.apply(PetActivityEvent(provider: provider, sessionId: "s", turnId: "t", eventId: "e\(index)",
+                                             kind: kind, occurredAt: 1000 + Double(index), toolId: nil, label: label), at: now)
+                if kind == .waiting {
+                    let waiting = store.presentation(at: now.addingTimeInterval(0.4))
+                    #expect(waiting.pose == .waiting)
+                    #expect(waiting.sessions.first?.session.title == "project")
+                    #expect(store.drainNotices(at: now.addingTimeInterval(0.4)).first?.kind == .waiting)
+                }
+            }
+            let completed = store.presentation(at: now)
+            #expect(completed.feedback?.title == "project")
+            #expect(completed.sessions.first?.session.title == "project")
+            let notice = store.drainNotices(at: now).first
+            #expect(notice?.sourceLabel == provider.title)
+            #expect(notice?.feedback == .completed)
+        }
     }
 
     @Test func baselineAndReconnectAreSilent() {
@@ -22,7 +60,7 @@ struct PetStoreTests {
         #expect(store.presentation(at: now).pose == .idle)
         store.disconnect(sourceID: "a", at: now)
         #expect(store.presentation(at: now).connectedSources == 0)
-        #expect(store.presentation(at: now).text == "未连接宿主")
+        #expect(!store.presentation(at: now).hasReceivedHook)
         store.apply(snapshot([finished]), at: now)
         #expect(store.presentation(at: now).pose == .idle)
     }
@@ -48,7 +86,7 @@ struct PetStoreTests {
         #expect(value.activeCount == 1)
         #expect(value.connectedSources == 2)
         #expect(value.sessions.count == 2)
-        #expect(value.text.contains("已完成"))
+        #expect(value.feedback?.kind == .completed)
     }
 
     @Test func waitingAndWorkingAreBothVisible() {
@@ -58,7 +96,7 @@ struct PetStoreTests {
         #expect(value.pose == .waiting)
         #expect(value.waitingCount == 1)
         #expect(value.activeCount == 1)
-        #expect(value.text.contains("仍在执行"))
+        #expect(value.activeCount > 0)
     }
 
     @Test func staleSnapshotCannotReplaceStateAndReplacementRemovesMissingSessions() {
@@ -97,15 +135,15 @@ struct PetStoreTests {
     }
 
     @Test func neutralOutcomesHaveDistinctTransientFeedback() {
-        let expected = ["aborted": "任务已停止", "blocked": "任务受阻，请查看 DSH",
-                        "max-tokens": "达到输出上限", "other": "本轮已结束"]
-        for (outcome, text) in expected {
+        let expected: [String: PetFeedbackKind] = ["aborted": .interrupted, "blocked": .blocked,
+                                                   "max-tokens": .maxTokens, "other": .other]
+        for (outcome, kind) in expected {
             let store = PetStore()
             store.apply(snapshot([session(phase: .thinking)]), at: now)
             store.apply(snapshot([session(phase: .stopped, result: SessionResult(id: "r", outcome: outcome))], seq: 2), at: now)
             #expect(store.presentation(at: now).pose == .idle)
-            #expect(store.presentation(at: now).text == text)
-            #expect(store.presentation(at: now.addingTimeInterval(4)).text == "准备就绪")
+            #expect(store.presentation(at: now).feedback?.kind == kind)
+            #expect(store.presentation(at: now.addingTimeInterval(4)).feedback == nil)
         }
     }
 
@@ -114,7 +152,7 @@ struct PetStoreTests {
         store.apply(snapshot([session(phase: .thinking)]), at: now)
         store.apply(snapshot([session(phase: .completed, result: SessionResult(id: "r", outcome: "completed"))], seq: 2), at: now)
         store.apply(snapshot([session(phase: .thinking, turn: 2)], seq: 3), at: now.addingTimeInterval(1))
-        #expect(!store.presentation(at: now.addingTimeInterval(1)).text.contains("已完成"))
+        #expect(store.presentation(at: now.addingTimeInterval(1)).feedback == nil)
     }
 
 
@@ -139,7 +177,7 @@ struct PetStoreTests {
         #expect(value.pose == .waiting)
         #expect(value.waitingCount == 1)
         #expect(value.activeCount == 0)
-        #expect(!value.text.contains("仍在执行"))
+        #expect(value.activeCount == 0)
     }
 
     @Test func snapshotWaitingNotifiesImmediatelyOncePerContinuousEpisode() {
@@ -247,6 +285,30 @@ struct PetStoreTests {
         store.apply(snapshot([], seq: 5), at: now.addingTimeInterval(21))
         store.apply(snapshot([session(phase: .completed, turn: 2, result: result)], seq: 6), at: now.addingTimeInterval(30))
         #expect(store.drainNotices(at: now.addingTimeInterval(30)).first?.turnDuration == nil)
+    }
+
+    @Test func everyOutcomeCarriesStructuredNoticeAndFeedback() throws {
+        let cases: [(String, PetFeedbackKind, PetNoticeKind)] = [
+            ("completed", .completed, .ended), ("error", .failed, .error),
+            ("aborted", .interrupted, .interrupted), ("blocked", .blocked, .ended),
+            ("max-tokens", .maxTokens, .ended), ("other", .other, .ended),
+        ]
+        for (outcome, expectedFeedback, expectedNotice) in cases {
+            let store = PetStore()
+            store.apply(snapshot([session(phase: .thinking)]), at: now)
+            store.apply(snapshot([session(phase: .stopped, result: SessionResult(id: "r", outcome: outcome))], seq: 2), at: now)
+            let state = store.presentation(at: now)
+            #expect(state.feedback?.kind == expectedFeedback)
+            #expect(state.feedback?.sourceLabel == "DSH")
+            let notice = try #require(store.drainNotices(at: now).first)
+            #expect(notice.kind == expectedNotice)
+            #expect(notice.feedback == expectedFeedback)
+        }
+        let store = PetStore()
+        store.apply(snapshot([session(phase: .thinking)]), at: now)
+        store.apply(snapshot([session(phase: .waiting)], seq: 2), at: now)
+        let notice = try #require(store.drainNotices(at: now).first)
+        #expect(notice.kind == .waiting && notice.feedback == nil)
     }
 
 }

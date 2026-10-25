@@ -194,8 +194,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.onPoke = { [weak self] in
             guard let self else { return }
             let presentation = self.store.presentation()
-            if presentation.pose == .waiting, let session = presentation.sessions.first(where: { $0.phase == .waiting }) {
-                self.showSession(sourceId: session.sourceId, sessionId: session.sessionId)
+            if presentation.pose == .waiting, let session = presentation.sessions.first(where: { $0.session.phase == .waiting }) {
+                self.showSession(sourceId: session.sourceId, sessionId: session.session.sessionId)
             } else { self.pokeUntil = Date().addingTimeInterval(1.2) }
             self.refresh()
         }
@@ -265,7 +265,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !stopped else { return }
         let now = Date()
         notifications?.refresh(store: store, enabled: preferences.systemNotifications,
-                               minimumDuration: preferences.noticeMinimumSeconds, at: now)
+                               minimumDuration: preferences.noticeMinimumSeconds,
+                               showSessionTitles: preferences.notificationSessionTitle, at: now)
         let presentation = store.presentation(at: now)
         deadlineTimer?.invalidate()
         deadlineTimer = nil
@@ -284,14 +285,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if presentation.activeCount > 0 || presentation.waitingCount > 0 || [.completed, .error].contains(presentation.pose) {
             lastActivity = now
         }
-        var pose = presentation.pose
-        if pose == .idle, now.timeIntervalSince(max(lastInteraction, lastActivity)) >= 60 { pose = .sleeping }
-        if now < pokeUntil { pose = .poke }
-        if dragging { pose = .drag }
-        if let demoPose { pose = demoPose }
-        var text = Self.presentationText(presentation, pose: pose)
-        if demoPose != nil { text = "预览 · \(pose.rawValue)" }
-        if status.connectionError != nil { text = "连接异常，查看菜单栏" }
+        let pose = PetPoseDecision.resolve(presentation: presentation, now: now,
+                                           lastInteraction: lastInteraction, lastActivity: lastActivity,
+                                           pokeUntil: pokeUntil, dragging: dragging, demoPose: demoPose)
+        var text = PetMessageProjector.bubble(presentation, pose: pose, bubbleWidth: view.bounds.width - 14,
+                                              connectionError: status.connectionError)
+        if demoPose != nil, status.connectionError == nil { text = "预览 · \(pose.rawValue)" }
         let animated = preferences.animations && panel.isVisible && systemSuspensions.isEmpty
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if let assets = assetsBySkin[preferences.skin], view.skin != preferences.skin {
@@ -303,24 +302,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         animator?.render(pose: pose, animated: animated && view.skin == .character && capturePath == nil)
     }
 
-    static func presentationText(_ presentation: PetPresentation, pose: PetPose) -> String {
-        if pose == .sleeping {
-            return presentation.connectedSources == 0 ? "休息中 · 暂无宿主状态" : "休息中"
-        }
-        if presentation.activeCount > 0, let feedback = presentation.feedback, feedback.pose == .completed,
-           pose == .working || pose == .thinking {
-            let remaining = "\(presentation.activeCount) " + (pose == .working ? "执行中" : "思考中")
-            if let source = feedback.sourceLabel { return "\(source)\n本轮结束 · \(remaining)" }
-            return "\(feedback.text)，\(remaining)"
-        }
-        return presentation.text
-    }
-
     private func showSession(sourceId: String, sessionId: String) {
         status.focusedSessionID = nil
         showSettings()
         DispatchQueue.main.async { [weak self] in
-            self?.status.focusedSessionID = PetStatusModel.rowID(sourceId: sourceId, sessionId: sessionId)
+            self?.status.focusedSessionID = PetMessageProjector.rowID(sourceId: sourceId, sessionId: sessionId)
         }
     }
 

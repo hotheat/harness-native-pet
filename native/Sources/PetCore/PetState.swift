@@ -28,6 +28,7 @@ public struct SessionResult: Codable, Equatable, Sendable {
 
 public struct SessionSnapshot: Codable, Equatable, Sendable {
     public let sessionId: String
+    public let title: String?
     public let turn: Int?
     public let phase: SessionPhase
     public let activeTools: Int
@@ -35,8 +36,9 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public let result: SessionResult?
 
     public init(sessionId: String, turn: Int?, phase: SessionPhase, activeTools: Int,
-                pendingApprovals: Int, result: SessionResult?) {
+                pendingApprovals: Int, result: SessionResult?, title: String? = nil) {
         self.sessionId = sessionId
+        self.title = title
         self.turn = turn
         self.phase = phase
         self.activeTools = activeTools
@@ -44,11 +46,12 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
         self.result = result
     }
 
-    enum CodingKeys: String, CodingKey { case sessionId, turn, phase, activeTools, pendingApprovals, result }
+    enum CodingKeys: String, CodingKey { case sessionId, title, turn, phase, activeTools, pendingApprovals, result }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         sessionId = try values.decode(String.self, forKey: .sessionId)
+        title = try values.decodeIfPresent(String.self, forKey: .title)
         turn = try values.decode(Int?.self, forKey: .turn)
         phase = try values.decode(SessionPhase.self, forKey: .phase)
         activeTools = try values.decode(Int.self, forKey: .activeTools)
@@ -59,6 +62,7 @@ public struct SessionSnapshot: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(sessionId, forKey: .sessionId)
+        try values.encode(title, forKey: .title)
         try values.encode(turn, forKey: .turn)
         try values.encode(phase, forKey: .phase)
         try values.encode(activeTools, forKey: .activeTools)
@@ -101,60 +105,68 @@ public struct PetNotice: Sendable {
     public let sourceLabel: String
     public let sessionId: String
     public let kind: PetNoticeKind
-    public let title: String
-    public let body: String
+    public let feedback: PetFeedbackKind?
     public let turnDuration: TimeInterval?
+    public let sessionTitle: String?
+
+    init(id: String, sourceId: String, sourceLabel: String, sessionId: String,
+         kind: PetNoticeKind, feedback: PetFeedbackKind?, turnDuration: TimeInterval?, sessionTitle: String? = nil) {
+        self.id = id
+        self.sourceId = sourceId
+        self.sourceLabel = sourceLabel
+        self.sessionId = sessionId
+        self.kind = kind
+        self.feedback = feedback
+        self.turnDuration = turnDuration
+        self.sessionTitle = sessionTitle
+    }
 }
 
 public struct PresentedSession: Equatable, Sendable {
     public let sourceId: String
     public let sourceLabel: String
-    public let sessionId: String
-    public let turn: Int?
-    public let phase: SessionPhase
-    public let activeTools: Int
-    public let pendingApprovals: Int
-    public let result: SessionResult?
+    public let session: SessionSnapshot
     public let isStale: Bool
 
     public init(sourceId: String, sourceLabel: String, session: SessionSnapshot, isStale: Bool = false) {
         self.sourceId = sourceId
         self.sourceLabel = sourceLabel
-        sessionId = session.sessionId
-        turn = session.turn
-        phase = session.phase
-        activeTools = session.activeTools
-        pendingApprovals = session.pendingApprovals
-        result = session.result
+        self.session = session
         self.isStale = isStale
     }
 }
 
+public enum PetFeedbackKind: String, Sendable {
+    case completed, failed, interrupted, blocked, maxTokens, other
+}
+
 public struct PresentedFeedback: Equatable, Sendable {
     public let pose: PetPose
-    public let text: String
+    public let kind: PetFeedbackKind
     public let sourceLabel: String?
+    public let title: String?
 
-    public init(pose: PetPose, text: String, sourceLabel: String?) {
+    public init(pose: PetPose, kind: PetFeedbackKind, sourceLabel: String?, title: String? = nil) {
         self.pose = pose
-        self.text = text
+        self.kind = kind
         self.sourceLabel = sourceLabel
+        self.title = title
     }
 }
 
 public struct PetPresentation: Sendable {
     public let pose: PetPose
-    public let text: String
+    public let hasReceivedHook: Bool
     public let activeCount: Int
     public let waitingCount: Int
     public let connectedSources: Int
     public let feedback: PresentedFeedback?
     public let sessions: [PresentedSession]
 
-    public init(pose: PetPose, text: String, activeCount: Int, waitingCount: Int,
-                connectedSources: Int, sessions: [PresentedSession], feedback: PresentedFeedback?) {
+    public init(pose: PetPose, activeCount: Int, waitingCount: Int,
+                connectedSources: Int, sessions: [PresentedSession], feedback: PresentedFeedback?, hasReceivedHook: Bool = false) {
         self.pose = pose
-        self.text = text
+        self.hasReceivedHook = hasReceivedHook
         self.activeCount = activeCount
         self.waitingCount = waitingCount
         self.connectedSources = connectedSources

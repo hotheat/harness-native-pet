@@ -1,14 +1,22 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { decodeMessage } from '../bridge/lib/protocol.js';
 import assert from 'node:assert/strict';
 const root = new URL('../', import.meta.url);
 const require = createRequire(new URL('bridge/package.json', root));
 const Ajv = require('ajv');
 const json = path => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
 const validate = new Ajv({allErrors: true, strict: true}).compile(json('contracts/bridge.schema.json'));
-for (const {name,message} of [...json('contracts/fixtures/snapshots.json'), ...json('contracts/fixtures/activity.json')]) assert(validate(message), `${name}: ${JSON.stringify(validate.errors)}`);
-for (const {name,message} of json('contracts/fixtures/invalid-messages.json')) assert(!validate(message), `${name} was accepted`);
+for (const {name,message,normalized} of [...json('contracts/fixtures/snapshots.json'), ...json('contracts/fixtures/activity.json')]) {
+  assert(validate(message), `${name}: ${JSON.stringify(validate.errors)}`);
+  assert(normalized, `${name}: missing normalized output`);
+  assert(validate(normalized), `${name} normalized: ${JSON.stringify(validate.errors)}`);
+  assert.deepEqual(decodeMessage(message), normalized, name);
+}
+for (const {name,message} of json('contracts/fixtures/invalid-messages.json')) {
+  assert(!validate(message), `${name} was accepted`);
+  assert.throws(() => decodeMessage(message), Error, name);
+}
 if (existsSync(new URL('bridge/fixtures/', root))) {
   for (const name of ['snapshots.json', 'activity.json', 'invalid-messages.json']) {
     const plugin = readFileSync(new URL(`bridge/fixtures/${name}`, root));

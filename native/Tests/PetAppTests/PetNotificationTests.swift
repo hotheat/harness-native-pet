@@ -32,12 +32,95 @@ struct PetNotificationTests {
         #expect(adapter.notices.count == 1)
         #expect(dispatcher.requestCount == 1)
         #expect(adapter.notices.first?.sourceLabel == "Codex")
-        #expect(adapter.notices.first?.sessionId == "same")
+        #expect(adapter.notices.first?.userInfo["sessionId"] == "same")
         let lines = try String(contentsOf: log, encoding: .utf8).split(separator: "\n")
         #expect(lines.count == 1)
-        let object = try JSONSerialization.jsonObject(with: Data(lines[0].utf8)) as? [String: String]
-        #expect(object?["sourceId"] == "hook:codex")
-        #expect(object?["kind"] == "ended")
+        let object = try JSONSerialization.jsonObject(with: Data(lines[0].utf8)) as? [String: Any]
+        #expect(object?["sourceId"] as? String == "hook:codex")
+        #expect(object?["kind"] as? String == "ended")
+        #expect(object?["sound"] as? Bool == false)
+        #expect(object?["threadIdentifier"] as? String == "hook:codex:same")
+        #expect(object?["userInfo"] as? [String: String] == ["sourceId": "hook:codex", "sessionId": "same"])
+    }
+
+    @Test func recordingContentWithoutIdentityWritesEmptyFields() throws {
+        let log = FileManager.default.temporaryDirectory.appendingPathComponent("pet-notices-\(UUID()).jsonl")
+        defer { try? FileManager.default.removeItem(at: log) }
+        let adapter = try RecordingPetNotificationAdapter(logURL: log)
+        let content = PetNotificationContent(id: "n", kind: .ended, sourceLabel: "DSH",
+                                             title: "DSH 会话提醒", body: "本轮已结束", sound: false,
+                                             threadIdentifier: "", userInfo: [:])
+        adapter.submit(content) { error in #expect(error == nil) }
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: log)) as? [String: Any]
+        #expect(object?["sourceId"] as? String == "")
+        #expect(object?["sessionId"] as? String == "")
+        #expect(object?["userInfo"] as? [String: String] == [:])
+        #expect(adapter.notices.count == 1)
+    }
+
+    @Test func dispatcherProjectsSessionTitlesForSnapshotAndHookNotices() throws {
+        for showTitles in [false, true] {
+            for title in [nil, "私密项目"] as [String?] {
+                for kind in [PetNoticeKind.waiting, .ended, .error, .interrupted] {
+                    for hook in [false, true] {
+                        let store = PetStore()
+                        let label = hook ? "Codex" : "DSH"
+                        if hook {
+                            // Terminal events without a label must retain the session's known title.
+                            store.apply(PetActivityEvent(provider: .codex, sessionId: "s", turnId: "t", eventId: "start",
+                                                         kind: .turnStarted, occurredAt: 1000, toolId: nil, label: title), at: now)
+                            let activity: PetActivityKind = switch kind {
+                            case .waiting: .waiting
+                            case .ended: .turnEnded
+                            case .error: .failed
+                            case .interrupted: .interrupted
+                            }
+                            store.apply(PetActivityEvent(provider: .codex, sessionId: "s", turnId: "t", eventId: "notice",
+                                                         kind: activity, occurredAt: 1001, toolId: nil), at: now)
+                        } else {
+                            store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: label, seq: 1, sessions: []), at: now)
+                            let phase: SessionPhase = switch kind {
+                            case .waiting: .waiting
+                            case .ended: .completed
+                            case .error: .error
+                            case .interrupted: .stopped
+                            }
+                            let outcome = kind == .error ? "error" : kind == .interrupted ? "aborted" : "completed"
+                            let session = SessionSnapshot(sessionId: "s", turn: 1, phase: phase, activeTools: 0,
+                                                          pendingApprovals: kind == .waiting ? 1 : 0,
+                                                          result: kind == .waiting ? nil : SessionResult(id: "r", outcome: outcome), title: title)
+                            store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: label, seq: 2, sessions: [session]), at: now)
+                        }
+                        let adapter = try RecordingPetNotificationAdapter()
+                        let dispatcher = PetNotificationDispatcher(adapter: adapter)
+                        dispatcher.refresh(store: store, enabled: true, showSessionTitles: showTitles, at: now.addingTimeInterval(0.4))
+                        let content = try #require(adapter.notices.first)
+                        #expect(adapter.notices.count == 1)
+                        #expect(content.title == (showTitles && title != nil ? "\(label) · 私密项目" : "\(label) 会话提醒"))
+                        #expect(!content.body.contains("私密项目"))
+                        #expect(content.userInfo == ["sourceId": hook ? "hook:codex" : "dsh", "sessionId": "s"])
+                        #expect(content.threadIdentifier == (hook ? "hook:codex:s" : "dsh:s"))
+                        #expect(content.sound == (kind == .waiting || kind == .error))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func notificationSessionTitlePreferenceDefaultsOffAndPersistsOnlyWhenEnabled() throws {
+        let name = "PetNotificationTitleTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let preferences = PetPreferences(defaults: defaults)
+        #expect(!preferences.notificationSessionTitle)
+        let automated = PetPreferences(defaults: defaults, persistChanges: false)
+        automated.notificationSessionTitle = true
+        #expect(defaults.object(forKey: "pet.notificationSessionTitle") == nil)
+        preferences.notificationSessionTitle = true
+        #expect(PetPreferences(defaults: defaults).notificationSessionTitle)
+        let automatedWithSavedValue = PetPreferences(defaults: defaults, persistChanges: false)
+        automatedWithSavedValue.notificationSessionTitle = false
+        #expect(PetPreferences(defaults: defaults).notificationSessionTitle)
     }
 
     @Test func disablingNotificationsDropsPendingNoticeWithoutReplay() throws {
@@ -76,7 +159,7 @@ struct PetNotificationTests {
         ]), at: now)
         model.update(store.presentation(at: now))
         #expect(model.sessionRows.first { $0.title == "Codex · same" }?.id == codexID)
-        #expect(codexID == PetStatusModel.rowID(sourceId: "hook:codex", sessionId: "same"))
+        #expect(codexID == PetMessageProjector.rowID(sourceId: "hook:codex", sessionId: "same"))
         #expect(model.summary.contains("Codex"))
         let name = "PetNotificationTests.\(UUID())"
         let defaults = UserDefaults(suiteName: name)!
@@ -138,9 +221,9 @@ struct PetNotificationTests {
             let presentation = store.presentation(at: now)
             #expect(presentation.connectedSources == 0)
             #expect(presentation.sessions.isEmpty)
-            let text = AppDelegate.presentationText(presentation, pose: presentation.pose)
+            let text = PetMessageProjector.bubble(presentation, pose: presentation.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14)
             try view.render(pose: presentation.pose, text: text, animated: false)
-            #expect(view.displayText == presentation.text)
+            #expect(view.displayText == text)
             #expect(view.displayText.contains("Codex"))
             #expect(view.displayText.contains(expected))
         }
@@ -235,7 +318,7 @@ struct PetNotificationTests {
         let assets = try PetAssets(skin: .dshPet)
         let view = PetView(assets: assets)
         view.frame = NSRect(origin: .zero, size: try assets.requiredPanelSize(characterHeight: 100))
-        try view.render(pose: presentation.pose, text: AppDelegate.presentationText(presentation, pose: presentation.pose))
+        try view.render(pose: presentation.pose, text: PetMessageProjector.bubble(presentation, pose: presentation.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14))
         view.layoutSubtreeIfNeeded()
         #expect(view.displayText == "Claude Code\n本轮结束 · 1 执行中")
         #expect(view.bubbleFrame.height > 20)
@@ -252,11 +335,11 @@ struct PetNotificationTests {
             let store = PetStore()
             store.apply(event(.turnEnded, id: "stop", provider: provider), at: now)
             let single = store.presentation(at: now)
-            #expect(single.feedback == PresentedFeedback(pose: .completed, text: "本轮回应已结束", sourceLabel: provider.title))
-            #expect(AppDelegate.presentationText(single, pose: single.pose) == "\(provider.title)：本轮回应已结束")
+            #expect(single.feedback == PresentedFeedback(pose: .completed, kind: .completed, sourceLabel: provider.title))
+            #expect(PetMessageProjector.bubble(single, pose: single.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14) == "\(provider.title)：本轮回应已结束")
             store.apply(event(.running, id: "other", session: "other"), at: now)
             let parallel = store.presentation(at: now)
-            #expect(AppDelegate.presentationText(parallel, pose: parallel.pose) == "\(provider.title)\n本轮结束 · 1 执行中")
+            #expect(PetMessageProjector.bubble(parallel, pose: parallel.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14) == "\(provider.title)\n本轮结束 · 1 执行中")
         }
         for phase in [SessionPhase.working, .thinking] {
             let store = PetStore()
@@ -266,8 +349,8 @@ struct PetNotificationTests {
                                             result: SessionResult(id: "r", outcome: "completed"))
             store.apply(SourceSnapshot(sourceId: "dsh", sourceLabel: "DSH", seq: 2, sessions: [busy, completed]), at: now)
             let state = store.presentation(at: now)
-            #expect(state.feedback == PresentedFeedback(pose: .completed, text: "任务已完成", sourceLabel: nil))
-            #expect(AppDelegate.presentationText(state, pose: state.pose) == "任务已完成，1 \(phase == .working ? "执行中" : "思考中")")
+            #expect(state.feedback == PresentedFeedback(pose: .completed, kind: .completed, sourceLabel: "DSH"))
+            #expect(PetMessageProjector.bubble(state, pose: state.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14) == "DSH\n本轮结束 · 1 \(phase == .working ? "执行中" : "思考中")")
         }
     }
 
@@ -276,7 +359,7 @@ struct PetNotificationTests {
         store.apply(event(.turnEnded, id: "stop"), at: now)
         let model = PetStatusModel()
         model.update(store.presentation(at: now.addingTimeInterval(899)))
-        #expect(model.sessionRows.first?.detail == "本轮回应结束 · 工具 0 · 待决定 0")
+        #expect(model.sessionRows.first?.detail == "本轮回应已结束 · 工具 0 · 待决定 0")
         model.update(store.presentation(at: now.addingTimeInterval(901)))
         #expect(model.sessionRows.isEmpty)
         #expect(model.sourceLabels.isEmpty)
@@ -323,8 +406,7 @@ struct PetNotificationTests {
         }
         store.apply(event(.waiting, id: "waiting", session: "waiting"), at: now)
         dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now.addingTimeInterval(0.4))
-        #expect(adapter.notices.map(\.sessionId) == ["long", "long-stop", "error", "waiting"])
-        #expect(adapter.notices.map(\.turnDuration) == [10, 11, 1, nil])
+        #expect(adapter.notices.map { $0.userInfo["sessionId"] } == ["long", "long-stop", "error", "waiting"])
         for notice in adapter.notices {
             #expect((SystemPetNotificationAdapter.content(for: notice).sound != nil) == [.waiting, .error].contains(notice.kind))
         }
@@ -342,7 +424,6 @@ struct PetNotificationTests {
         #expect(dispatcher.requestCount == 1)
         let notice = try #require(adapter.notices.first)
         #expect(notice.kind == .ended)
-        #expect(notice.turnDuration == nil)
     }
 
     @Test func firstInterruptionBypassesDurationThreshold() throws {
@@ -355,7 +436,6 @@ struct PetNotificationTests {
         #expect(dispatcher.requestCount == 1)
         let notice = try #require(adapter.notices.first)
         #expect(notice.kind == .interrupted)
-        #expect(notice.turnDuration == nil)
     }
 
     @Test func unknownDurationIsSubmittedAndResultContentIsSilent() throws {
@@ -369,7 +449,6 @@ struct PetNotificationTests {
         ]), at: now)
         dispatcher.refresh(store: store, enabled: true, minimumDuration: 10, at: now)
         let ended = try #require(adapter.notices.first)
-        #expect(ended.turnDuration == nil)
         let content = SystemPetNotificationAdapter.content(for: ended)
         #expect(content.sound == nil)
         #expect(content.userInfo["sourceId"] as? String == "dsh")
@@ -385,15 +464,15 @@ struct PetNotificationTests {
         let status = PetStatusModel()
         status.notificationError = "旧错误"
         dispatcher.onError = { status.notificationError = $0 }
-        dispatcher.onOpen = { status.focusedSessionID = PetStatusModel.rowID(sourceId: $0, sessionId: $1) }
+        dispatcher.onOpen = { status.focusedSessionID = PetMessageProjector.rowID(sourceId: $0, sessionId: $1) }
         let store = PetStore()
         store.apply(event(.turnEnded, id: "end"), at: now)
         dispatcher.refresh(store: store, enabled: true, at: now)
         #expect(status.notificationError == nil)
         adapter.onOpen?("hook:codex", "same")
-        #expect(status.focusedSessionID == PetStatusModel.rowID(sourceId: "hook:codex", sessionId: "same"))
-        #expect(PetStatusModel.rowID(sourceId: "a", sessionId: "bc") != PetStatusModel.rowID(sourceId: "ab", sessionId: "c"))
-        #expect(PetStatusModel.rowID(sourceId: "中", sessionId: "s") == "3:中s")
+        #expect(status.focusedSessionID == PetMessageProjector.rowID(sourceId: "hook:codex", sessionId: "same"))
+        #expect(PetMessageProjector.rowID(sourceId: "a", sessionId: "bc") != PetMessageProjector.rowID(sourceId: "ab", sessionId: "c"))
+        #expect(PetMessageProjector.rowID(sourceId: "中", sessionId: "s") == "3:中s")
     }
 
     @Test func noticeMinimumPreferenceAcceptsNumberAndLaunchArgumentString() {
@@ -420,7 +499,7 @@ struct PetNotificationTests {
 private final class DeniedNotificationAdapter: PetNotificationAdapter {
     var onOpen: ((String, String) -> Void)?
     func authorization(request: Bool) async -> PetNotificationAuthorization { .denied }
-    func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void) {
+    func submit(_ notice: PetNotificationContent, completion: @escaping @MainActor @Sendable (String?) -> Void) {
         completion("通知未授权")
     }
 }
@@ -435,7 +514,7 @@ private final class AuthorizationTrackingAdapter: PetNotificationAdapter {
         if request { status = .denied }
         return status
     }
-    func submit(_ notice: PetNotice, completion: @escaping @MainActor @Sendable (String?) -> Void) {
+    func submit(_ notice: PetNotificationContent, completion: @escaping @MainActor @Sendable (String?) -> Void) {
         completion(nil)
     }
 }

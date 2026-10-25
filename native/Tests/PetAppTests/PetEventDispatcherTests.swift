@@ -47,7 +47,7 @@ struct PetEventDispatcherTests {
         let state = store.presentation()
         #expect(state.connectedSources == 1)
         #expect(state.pose == .thinking)
-        #expect(state.sessions.map(\.sessionId) == ["new"])
+        #expect(state.sessions.map(\.session.sessionId) == ["new"])
     }
     @Test func protocolWarningDoesNotReplaceHealthyPresentation() async {
         let store = PetStore()
@@ -69,7 +69,7 @@ struct PetEventDispatcherTests {
         #expect(status.protocolWarning == "协议不兼容")
         #expect(status.connectionError == nil)
         #expect(state.connectedSources == 1)
-        #expect(AppDelegate.presentationText(state, pose: state.pose) == "1 个会话正在执行")
+        #expect(PetMessageProjector.bubble(state, pose: state.pose, bubbleWidth: PetPreferences.Size.medium.panelSize.width - 14) == "1 个会话正在执行")
     }
 
 }
