@@ -33,7 +33,7 @@ final class PetPreferences: ObservableObject {
         self.defaults = defaults
         self.persistChanges = persistChanges
         let minimum = defaults.object(forKey: "pet.noticeMinimumSeconds")
-        noticeMinimumSeconds = (minimum as? NSNumber)?.doubleValue ?? (minimum as? String).flatMap(Double.init) ?? 10
+        noticeMinimumSeconds = (minimum as? NSNumber)?.doubleValue ?? (minimum as? String).flatMap(Double.init) ?? 3
         skin = PetSkin(rawValue: defaults.string(forKey: "pet.skin") ?? "") ?? .character
         visible = defaults.object(forKey: "pet.visible") == nil ? true : defaults.bool(forKey: "pet.visible")
         clickThrough = defaults.bool(forKey: "pet.clickThrough")

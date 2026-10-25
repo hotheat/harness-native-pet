@@ -15,7 +15,7 @@
 - 收到过任意 hook 事件后，空列表显示“准备就绪”，不再显示“未连接宿主”。
 - DSH 快照的 waiting 由 bridge 去抖，Swift 收到非基线快照中新出现的 waiting 立即提醒。
 - hook waiting 到期、反馈到期时主动刷新，不依赖 1 s 定时器。
-- 系统通知：waiting、error 带声音，结束与中断静音；结束与中断在回合时长短于阈值（默认 10 s）时不发系统通知，桌宠反馈不变。
+- 系统通知：waiting、error 带声音，结束与中断静音；结束与中断在回合时长短于阈值（默认 3 s）时不发系统通知，桌宠反馈不变。
 - 点击系统通知或在等待状态点击桌宠，打开设置并定位、高亮对应会话。
 - 通知发送成功后清除旧错误；通知权限被拒时菜单和设置提供打开系统设置的入口。
 - IPC 监听失败不释放实例锁，菜单提供重试；IPC 拒绝消息时在设置中显示原因，不进入桌宠气泡。
@@ -35,7 +35,7 @@
 
 ## Open Decisions
 - **Important**：协议 `v` 字段改为“应用启动同步 helper + 拒绝原因可见”。当前没有待发布的线格式变更，加 `v` 只为预防；而旧 helper 滞留这个真实问题由同步直接修复。若后续变更线格式再引入版本号。
-- **Important**：结束提醒的短回合阈值默认 10 s，保存在 `pet.noticeMinimumSeconds`，暂不在设置界面暴露；自动化脚本传 `-pet.noticeMinimumSeconds 0`。
+- **Important**：结束提醒的短回合阈值默认 3 s，保存在 `pet.noticeMinimumSeconds`，暂不在设置界面暴露；自动化脚本传 `-pet.noticeMinimumSeconds 0`。
 
 ## Architecture Changes
 SwiftPM target 与依赖方向不变：`PetCore` 仅依赖 Foundation，`PetIPC → PetCore`，`PetHooks → PetCore, PetIPC`，应用 → `PetCore, PetIPC`。
@@ -160,7 +160,7 @@ flowchart LR
    - Verify: `PetStoreTests` 新增快照 waiting 在同一时刻 drain 即得提醒；基线 waiting 不提醒。
    - Risk: Low
 4. **发声与短回合过滤**（Files: `PetState.swift`, `PetStore.swift`, `PetNotifications.swift`, `PetPreferences.swift`, `AppDelegate.swift`, 两个 Python 脚本）
-   - Action: `PetNotice.turnDuration`（hook 取 `occurredAt - turnStartedAt`；DSH 取会话进入活动的接收时刻至结果时刻）；`PetNotificationDispatcher.refresh(store:enabled:minimumDuration:at:)`，`minimumDuration` 默认 0，过滤 `.ended`/`.interrupted`；系统 adapter 仅 waiting/error 设置声音；偏好 `noticeMinimumSeconds` 读 `pet.noticeMinimumSeconds`，默认 10。
+   - Action: `PetNotice.turnDuration`（hook 取 `occurredAt - turnStartedAt`；DSH 取会话进入活动的接收时刻至结果时刻）；`PetNotificationDispatcher.refresh(store:enabled:minimumDuration:at:)`，`minimumDuration` 默认 0，过滤 `.ended`/`.interrupted`；系统 adapter 仅 waiting/error 设置声音；偏好 `noticeMinimumSeconds` 读 `pet.noticeMinimumSeconds`，默认 3。
    - Verify: 分发器单测覆盖阈值与 waiting/error 不受阈值影响。
    - Risk: Low
 5. **点击定位与错误清除**（Files: `PetNotifications.swift`, `SettingsView.swift`, `AppDelegate.swift`）
